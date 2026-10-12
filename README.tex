@@ -1,0 +1,221 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue]{hyperref}
+\usepackage{enumitem}
+\usepackage{listings}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  frame=single,
+  framesep=4pt,
+  xleftmargin=4pt,
+  columns=flexible,
+  breaklines=true,
+  showstringspaces=false
+}
+
+\title{Replication package\\
+\large A Matching-Theoretic Approach to Optimal Charging Station Selection
+for Electric Vehicles}
+\author{Luca Ambrosino, Chu Thi Mai Hong, Laurent El Ghaoui,
+Giuseppe C. Calafiore}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{What this is}
+
+Everything needed to reproduce the figures and tables of the paper: the
+MATLAB code, the charging-network data, and the scripts that built those
+data from the public source. Each experiment is one function, and each
+function states in its header which section of the paper it produces.
+
+The code is written to be run and read, not only run. Where a choice is not
+obvious, or where we got it wrong once, the reason is in a comment next to
+it.
+
+\section{Requirements}
+
+MATLAB R2021b or later. The experiments were run on R2023b under Windows,
+on a machine with 14 physical cores; the timings reported in Section~3.4.2
+of the paper refer to that machine.
+
+Three toolboxes are used:
+
+\begin{itemize}[nosep]
+  \item \textbf{Statistics and Machine Learning Toolbox}, for
+        \texttt{datasample} and \texttt{quantile};
+  \item \textbf{Mapping Toolbox}, for the basemaps under the city maps.
+        Without it the maps still draw, on plain axes;
+  \item \textbf{Optimization Toolbox} or \textbf{Mosek}, for the MILP and
+        its relaxation in \texttt{time\_scaling}. Mosek is preferred and is
+        what the paper used; \texttt{intlinprog} is used automatically if
+        \texttt{mosekopt} is not on the path.
+\end{itemize}
+
+Nothing else is needed. The Hungarian algorithm, the Hopcroft--Karp
+matching and the greedy policies are all included here and are
+self-contained.
+
+\section{Layout}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\texttt{code/} & the nine experiments and everything they call \\
+\texttt{data/} & the three city networks, plus the national source file \\
+\texttt{data\_preparation/} & how the city files were built from the source \\
+\texttt{figures/} & every figure of the paper, as produced by the code \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Running everything}
+
+From the \texttt{code/} folder:
+
+\begin{lstlisting}
+>> run_all_simulations
+\end{lstlisting}
+
+This runs the nine experiments in the order in which they appear in the
+paper and takes a couple of hours, most of it in \texttt{time\_scaling},
+which solves a mixed-integer program at eight sizes, and in the three real
+networks, which solve $100$ assignment problems each.
+
+Order matters in one place only. \texttt{calibration\_pareto} writes
+\texttt{calibrated\_alpha.mat}, and every later script reads the two
+coefficients from it. A copy of that file is shipped with the package, so
+the calibration step can be skipped and the numbers in the paper still come
+out. Each script announces, once per session, which coefficients it is
+using and where they came from; if it says \emph{literature} instead of
+\emph{calibrated}, the \texttt{.mat} file is not on the path.
+
+\section{Running one experiment}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Paper} & \textbf{Command} & \textbf{Produces} \\
+\midrule
+Sec.~3.2   & \texttt{calibration\_pareto}      & Table 1, Fig.~3 \\
+Sec.~3.3.1, 3.3.3 & \texttt{structural\_analysis} & Fig.~4, Fig.~5 \\
+Sec.~3.3.2 & \texttt{synthetic\_comparison}    & Table 2, Fig.~6 \\
+Sec.~3.4.1 & \texttt{toy\_equivalence}         & Fig.~7 \\
+Sec.~3.4.2 & \texttt{time\_scaling}            & Fig.~8 \\
+Sec.~4.1   & \texttt{realworld\_analysis(...)} & Tables 3--4, Figs.~9--12 \\
+Sec.~4.2   & \texttt{feasibility\_sweep(...)}  & Table 5, Fig.~13 \\
+Sec.~4.3   & \texttt{load\_sweep(...)}         & Table 6, Fig.~14 \\
+Sec.~4.4   & \texttt{sensitivity\_alpha(...)}  & Fig.~15 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The four scripts that take an argument want the path to a city file:
+
+\begin{lstlisting}
+>> realworld_analysis('../data/CS_location_DC_complete.csv')
+>> realworld_analysis('../data/CS_location_Chicago.xlsx')
+>> realworld_analysis('../data/CS_location_Manhattan.xlsx')
+>> feasibility_sweep('../data/CS_location_DC_complete.csv')
+>> load_sweep('../data/CS_location_DC_complete.csv')
+>> sensitivity_alpha('../data/CS_location_DC_complete.csv')
+\end{lstlisting}
+
+The city name is inferred from the file name and used to tag the figures,
+so the three cities do not overwrite each other. Pass it explicitly as a
+third argument if the file is named differently.
+
+Every script prints its results table to the console in a form that can be
+pasted straight into \LaTeX{}. The tables in the paper are those blocks,
+merged across cities by hand.
+
+\section{The data}
+
+\texttt{data/} holds the three networks used in Section~4:
+
+\begin{center}
+\begin{tabular}{llrr}
+\toprule
+\textbf{City} & \textbf{File} & \textbf{Stations} & \textbf{Ports} \\
+\midrule
+Washington DC   & \texttt{CS\_location\_DC\_complete.csv}  & 334 & 1053 \\
+Chicago         & \texttt{CS\_location\_Chicago.xlsx}      & 277 &  725 \\
+Manhattan (NY)  & \texttt{CS\_location\_Manhattan.xlsx}    & 352 & 1061 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Each row is one station, with its coordinates and the number of connectors
+of each type. The code expands every station into its individual ports,
+since the model is formulated at port level.
+
+\texttt{USA\_EV\_CS.csv} is the national source these were extracted from.
+It is included so that the three city files can be rebuilt, or new cities
+added, without hunting for the original download.
+
+\section{Rebuilding the city files}
+
+The source file gives addresses, not coordinates. \texttt{data\_preparation/}
+contains the pipeline that produced the three city files, in the order in
+which it is run:
+
+\begin{enumerate}[nosep]
+  \item \texttt{process\_EV\_charging\_data} selects the rows of one
+        metropolitan area from the national file;
+  \item \texttt{Coordinates\_Finder} sends the addresses to the U.S.\ Census
+        Bureau batch geocoder, in blocks, and collects the answers;
+  \item \texttt{merge\_census\_results} joins the geocoded coordinates back
+        onto the station records;
+  \item \texttt{clean\_city\_file} drops the rows the geocoder could not
+        resolve and writes the final file.
+\end{enumerate}
+
+Step 2 needs an internet connection and is the slow one. There is no need to
+run any of this to reproduce the paper: the three output files are already
+in \texttt{data/}.
+
+\section{What is random and what is not}
+
+The physical network is fixed: station coordinates and connector powers come
+from the data and never change. Everything describing the demand and the
+operating conditions is redrawn at every instance, namely vehicle positions,
+energy demands, budgets, tariffs and waiting times.
+
+Every script seeds the generator at the top, so a given script reproduces
+its own numbers exactly. Across versions of MATLAB the stream may differ in
+the last digits; the figures in the paper are averages over $100$ instances
+and are stable well beyond that.
+
+One consequence worth knowing: adding a method to a comparison consumes
+random numbers and shifts the stream, so the other methods move slightly
+too. If a number changes in the second decimal after you edit a script, this
+is usually why.
+
+\section{A note on the big-M}
+
+Forbidden pairs are given to the Hungarian algorithm as a large but
+\emph{finite} penalty. On an infeasible instance the algorithm therefore
+does not fail: it returns a complete assignment that quietly uses forbidden
+pairs. Counting the assigned vehicles detects nothing, since the count is
+$N$ either way.
+
+Every script that solves an assignment problem checks feasibility with
+\texttt{hopcroft\_karp} before solving, and verifies afterwards that the
+returned assignment lies inside the acceptable matrix. If you reuse this
+code, keep both checks.
+
+\section{License and contact}
+
+The code is released under the MIT license. The charging-station data are
+derived from a public U.S.\ Department of Energy dataset and are
+redistributed here for reproducibility only.
+
+Questions and bug reports: \href{mailto:luca.ambrosino@polito.it}{luca.ambrosino@polito.it}.
+
+\end{document}
