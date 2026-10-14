@@ -44,8 +44,17 @@ end
 
 useCvx = measureCvxOverhead && (exist('cvx_begin', 'file') == 2);
 if useCvx
-    cvx_solver mosek
-    cvx_solver_settings('MSK_IPAR_OPTIMIZER', 'MSK_OPTIMIZER_FREE_SIMPLEX')
+    % Mosek is what the reported CVX timings used. If CVX is installed but
+    % Mosek is not, fall back to whatever CVX has rather than aborting: the
+    % point of this curve is the size of the modelling overhead, and that is
+    % not specific to one solver.
+    try
+        cvx_solver mosek
+        cvx_solver_settings('MSK_IPAR_OPTIMIZER', 'MSK_OPTIMIZER_FREE_SIMPLEX')
+    catch ME
+        warning('Could not select Mosek under CVX (%s); using the CVX default.', ...
+                ME.message);
+    end
 end
 
 use_sparse = (exist('hungarian_assignment_sparse', 'file') == 2);

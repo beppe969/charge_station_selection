@@ -1,19 +1,46 @@
 function results = structural_analysis(figdir)
-% STRUCTURAL_ANALYSIS  How the optimum reacts to the size of the two sides.
+% STRUCTURAL_ANALYSIS  Effect of the infrastructure size and of the demand.
 %
-% Sections 3.3.1 and 3.3.3. Three experiments:
-%   Part 1  add ports at fixed demand, and add vehicles at fixed network;
-%   Part 2  decompose the objective as new SITES are added;
-%   Part 3  same, but every added port is a copy of an existing one.
+% Code edited by Luca Ambrosino.
+% Optimal Charging Station Selection for EVs.
 %
-% Both sweeps use nested instances: one large scenario is drawn and the
-% smaller ones are restrictions of it. That way the monotonicity we observe
-% is the theoretical inclusion of feasible sets, instance by instance, and
-% not a trend averaged over unrelated scenarios.
+% This function reproduces Section 3.3 of the paper. Starting from the
+% baseline configuration M = 500 charging ports and N = 250 EVs, it varies
+% one dimension at a time and produces two figures:
 %
-% Produces monotonicity.pdf, objective_decomposition.pdf and
-% decomposition_replication.pdf.
-
+%   FIGURE 1 - Monotonicity (two panels), optimal objective per EV.
+%       Left  : fix the demand N and add charging ports M. Adding ports can
+%               only enlarge the feasible set, so the objective decreases.
+%       Right : fix M and increase the demand N. The cheap and nearby ports
+%               get taken first, so each additional vehicle is served at a
+%               progressively worse cost.
+%       Both panels report the objective PER EV, so the two curves are
+%       directly comparable and cross at the baseline (M = 500, N = 250).
+%
+%   FIGURE 2 - Objective decomposition.
+%       As ports are added, which of the four terms of the objective
+%       actually improves? Since distance, waiting time, price and power
+%       have incommensurable units, each is reported as a relative
+%       improvement with respect to the smallest infrastructure size, and
+%       signed so that POSITIVE always means BETTER (lower distance,
+%       waiting and price; higher delivered power).
+%       This costs nothing extra: the numbers come from the very same MILP
+%       solutions computed for the left panel of Figure 1.
+%
+% NESTED SAMPLING. For each repetition a SINGLE large scenario is drawn,
+% and the smaller instances are obtained by keeping only the first M rows
+% (or the first N columns) of it. The sub-instances are therefore exactly
+% the large one restricted to fewer ports (or fewer vehicles), so the
+% monotonicity holds instance by instance and not merely on average.
+%
+% INPUT
+%   figdir  (optional) folder where the figures are saved as PDF.
+%
+% OUTPUT
+%   results struct with the raw numbers, to redraw the plots without
+%           re-running the simulations.
+%
+% REQUIRES: CVX with Mosek (MILP), and hopcroft_karp.m
 
 if nargin < 1
     % Default: save every figure. Pass '' to run without saving.
@@ -51,13 +78,17 @@ rng(1); % set seed
 M_base = 500;   % Number of charging ports
 N_base = 250;   % Number of electric vehicles
 
-% Sweeps. Both lists contain the baseline value, so the two curves can be
-% checked against each other at (M_base, N_base).
-M_list = [250 300 400 500 600 700 850 1000];   % ports  (N fixed at N_base)
-N_list = [ 50 100 150 250 300 350 420  490];   % EVs    (M fixed at M_base)
+% Sweeps. Evenly spaced, so that the shape of the curve is not an artefact
+% of where the points happen to fall. Both lists contain the baseline, so
+% the two panels can be checked against each other at (M_base, N_base).
+M_list = [250 300:100:1000];                   % ports  (N fixed at N_base)
+N_list = 50:50:500;                            % EVs    (M fixed at M_base)
+% N stops at M_base: at N = M every port must be used and the instance is
+% the tightest the model admits. It is still feasible at p_acc = 0.6, but
+% any infeasible draw is discarded like the others.
 
 p_acc = 0.6;   % acceptance probability of the acceptable matrix A
-REPS  = 10;    % scenarios averaged per size
+REPS  = 30;    % scenarios averaged per size
 
 % Objective coefficients. Every term of the objective is expressed in
 % dollars, so these are conversion factors with a physical meaning

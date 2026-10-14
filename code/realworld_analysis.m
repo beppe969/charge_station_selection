@@ -43,6 +43,14 @@ if nargin < 3 || isempty(cityTag)
 end
 cityTag = char(cityTag);
 
+% cityTag is what goes into file names, so it has to stay short and free of
+% spaces. For figure titles we want the name as it appears in the paper.
+switch lower(cityTag)
+    case 'washington', cityName = 'Washington DC';
+    case 'manhattan',  cityName = 'Manhattan (New York)';
+    otherwise,         cityName = cityTag;
+end
+
 % Make sure the output folder exists from the very beginning. The automatic
 % save block at the end of the function would create it, but the per-figure
 % export lines scattered through the code run BEFORE that, so uncommenting
@@ -602,7 +610,7 @@ scatter(ax, evLon, evLat, 14, [0.85 0.20 0.15], 'filled', ...
         'MarkerFaceAlpha', 0.85, 'DisplayName', 'electric vehicles');
 
 xlabel(ax, 'Longitude'); ylabel(ax, 'Latitude');
-title(ax, sprintf('Optimal assignment, Washington DC (M = %d ports, N = %d EVs)', M, N));
+title(ax, sprintf('Optimal assignment, %s (M = %d ports, N = %d EVs)', cityName, M, N));
 legend(ax, 'Location', 'southwest');
 axis(ax, 'equal'); set(ax, 'FontSize', 11);
 

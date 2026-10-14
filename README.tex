@@ -21,7 +21,7 @@
 \title{Replication package\\
 \large A Matching-Theoretic Approach to Optimal Charging Station Selection
 for Electric Vehicles}
-\author{Luca Ambrosino, Chu Thi Mai Hong, Laurent El Ghaoui,
+\author{Luca Ambrosino, Hong T. M. Chu, Laurent El Ghaoui,
 Giuseppe C. Calafiore}
 \date{\today}
 
@@ -70,7 +70,7 @@ self-contained.
 \texttt{code/} & the nine experiments and everything they call \\
 \texttt{data/} & the three city networks, plus the national source file \\
 \texttt{data\_preparation/} & how the city files were built from the source \\
-\texttt{figures/} & every figure of the paper, as produced by the code \\
+\texttt{figures/} & the figures, exactly as the code produces them \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -105,13 +105,13 @@ using and where they came from; if it says \emph{literature} instead of
 \midrule
 Sec.~3.2   & \texttt{calibration\_pareto}      & Table 1, Fig.~3 \\
 Sec.~3.3.1, 3.3.3 & \texttt{structural\_analysis} & Fig.~4, Fig.~5 \\
-Sec.~3.3.2 & \texttt{synthetic\_comparison}    & Table 2, Fig.~6 \\
-Sec.~3.4.1 & \texttt{toy\_equivalence}         & Fig.~7 \\
-Sec.~3.4.2 & \texttt{time\_scaling}            & Fig.~8 \\
-Sec.~4.1   & \texttt{realworld\_analysis(...)} & Tables 3--4, Figs.~9--12 \\
-Sec.~4.2   & \texttt{feasibility\_sweep(...)}  & Table 5, Fig.~13 \\
-Sec.~4.3   & \texttt{load\_sweep(...)}         & Table 6, Fig.~14 \\
-Sec.~4.4   & \texttt{sensitivity\_alpha(...)}  & Fig.~15 \\
+Sec.~3.3.2 & \texttt{synthetic\_comparison}    & Table 2 \\
+Sec.~3.4.1 & \texttt{toy\_equivalence}         & Fig.~6 \\
+Sec.~3.4.2 & \texttt{time\_scaling}            & Fig.~7 \\
+Sec.~4.1   & \texttt{realworld\_analysis(...)} & Tables 3--4, Figs.~8--11 \\
+Sec.~4.2   & \texttt{feasibility\_sweep(...)}  & Table 5, Fig.~12 \\
+Sec.~4.3   & \texttt{load\_sweep(...)}         & Table 6, Fig.~13 \\
+Sec.~4.4   & \texttt{sensitivity\_alpha(...)}  & Fig.~14 \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -130,6 +130,14 @@ The four scripts that take an argument want the path to a city file:
 The city name is inferred from the file name and used to tag the figures,
 so the three cities do not overwrite each other. Pass it explicitly as a
 third argument if the file is named differently.
+
+The code draws more than the paper shows. Every city produces its own maps and
+its own boxplot of each criterion, and \texttt{synthetic\_comparison} draws the
+boxplots behind Table 2, whereas the paper displays one city per figure to keep
+the page count down; \texttt{figures/} therefore holds rather more files than
+there are figures in the paper. The two bipartite-graph diagrams of
+Section~2.3, Figures 1 and 2, are the only ones the code does not generate:
+they were drawn by hand.
 
 Every script prints its results table to the console in a form that can be
 pasted straight into \LaTeX{}. The tables in the paper are those blocks,

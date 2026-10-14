@@ -318,8 +318,11 @@ xlabel('driving range R_{max} [km]');
 ylabel('share of layouts [%]');
 title(sprintf('At \\rho \\in [%.2f, %.2f] $/kWh', ...
       rhoBarGrid(bNom)-halfBand, rhoBarGrid(bNom)+halfBand));
-legend({'feasible (exact)', 'no stranded EV', 'passing (14)', ...
-        'certified by (12)'}, 'Location','southeast', 'Box','off');
+% Label the two conditions by what they are, not by their equation number in
+% the paper: the numbers shift whenever an equation is added upstream.
+legend({'feasible (exact)', 'no stranded EV', ...
+        'passing the necessary condition', ...
+        'certified by the sufficient condition'}, 'Location','southeast', 'Box','off');
 hold off;
 
 if ~isfolder(figdir),  mkdir(figdir);  end
