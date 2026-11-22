@@ -1,0 +1,65 @@
+Charging-port assignment | Analyses added for the IEEE T-ITS version
+====================================================================
+
+The IEEE Transactions on Intelligent Transportation Systems version of the
+manuscript (main_tits_v2.tex) adds three analyses to those described in
+REPRODUCE_SUBMISSION.txt. Both scripts use the pinned environment in
+requirements.txt (CPython 3.9, NumPy 1.20.3, SciPy 1.7.3, pandas 1.5.3,
+Matplotlib 3.4.3) and the source-reconciled public inventories. From the
+package root:
+
+    python code/driver_outcomes.py --workers 2
+    python code/rolling_horizon.py --workers 2
+
+Each takes well under a minute on a laptop. Outputs go to results/tits/.
+
+1. Per-driver outcomes of joint reassignment (driver_outcomes.py, Part 1)
+   For the three cities at half load (30 layouts, three processing orders,
+   seed 103721 as in the city study), every driver served by sequential cost
+   booking is compared under that booking and under the minimum-cost
+   reassignment of exactly the same drivers. driver_outcomes_drivers.csv.gz
+   lists every driver; driver_outcomes_summary.csv gives the shares of drivers
+   who gain and lose, mean gains and losses, the gain-to-loss ratio and the
+   savings when no driver may lose more than 0, 2, 5, 10 or 20 dollars
+   (pairs exceeding the cap are removed before solving the assignment).
+   The zero-cap saving is exactly zero, as Proposition 4 of the manuscript
+   (Pareto efficiency of sequential least-cost booking) predicts.
+   driver_rows.tex supplies Table V.
+
+2. DC charging taper (driver_outcomes.py, Part 2)
+   Washington at half load, with the average power of a DC session falling
+   linearly with the request, from the nominal effective power at 20 kWh to
+   half of it at 60 kWh. With the factor set to one the code reproduces the
+   published base row (4.63%). taper_summary.csv supplies the added row of
+   the sensitivity table.
+
+3. Rolling-horizon dispatch (rolling_horizon.py)
+   Washington, six hours of Poisson arrivals at 1.5, 3.0 or 4.5 requests per
+   minute, 30 layouts per rate (arrival seed [103721, 0, layout, 60607, rate
+   index]). Reservations hold a port from confirmation until departure
+   (travel at 22 km/h, site wait, charging session); requests unassigned
+   after 30 minutes are lost with a 100-dollar fallback. Immediate least-cost
+   booking is compared with maximum-service minimum-cost batches every 1, 2,
+   5, 10, 15, 20 or 30 minutes; confirmation delay is valued at 0.224 dollars
+   per minute. rolling_summary.csv holds paired differences with 95%
+   bootstrap intervals (2,000 resamples, seed 4577); rolling_horizon.pdf is
+   Fig. 3 of the manuscript and rolling_rows.tex a table of the same results.
+
+4. Occupancy price and robustness of the rolling-horizon comparison
+   (rolling_horizon.py --extensions)
+
+    python code/rolling_horizon.py --extensions --workers 2
+
+   (a) A fast-port occupancy price kappa (dollars per minute of holding time)
+       is added to the dispatcher's scores but not to reported costs.
+       rolling_kappa_tuning.csv tunes kappa on layouts 100-109, separate from
+       the evaluation layouts; kappa = 0.8 maximizes service at 4.5 requests
+       per minute. rolling_throughput_summary.csv evaluates immediate booking
+       and batches of 1, 2, 5 and 10 minutes with kappa = 0 and 0.8 on
+       layouts 0-29.
+   (b) rolling_robustness_summary.csv repeats the comparison with a three-
+       hour warm-up in a nine-hour horizon (requests arriving after 180
+       minutes are counted), patience of 15 or 60 minutes, and fallback
+       costs of 50 or 200 dollars. It supplies Table VII of the manuscript.
+   Paired intervals use 2,000 bootstrap resamples of whole layouts (seed
+   4577). The run takes about one minute with two workers.

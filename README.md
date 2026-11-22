@@ -38,3 +38,7 @@ For example, across the 96 Washington test batches, two ports on a 14.4-kilowatt
 The release includes a SHA-256 (Secure Hash Algorithm, 256-bit) manifest. On a fresh checkout, run `shasum -a 256 -c SHA256SUMS.txt` on macOS or `sha256sum -c SHA256SUMS.txt` on Linux. The command checks the files exactly as distributed. When comparing a new run, use the numerical summaries in the reproduction guide. Figure creation dates and machine-specific solver timings can differ.
 
 The [detailed guide](REPRODUCE_SUBMISSION.txt) describes the random seeds, scenarios, output columns and MATLAB commands. The [baseline technical guide](README.pdf) documents the inventory reconciliation, road network and solver benchmarks. The earlier study’s plots are in [figures](figures/), and the revised paper’s plots and tables are in [results](results/). The original release identifies the project code license as MIT. The archived data retain their source terms, and third-party code retains its attribution.
+
+## Analyses for the IEEE T-ITS version
+
+The per-driver outcomes, DC charging-taper sensitivity, rolling-horizon dispatch, fast-port occupancy price and robustness checks added for the IEEE Transactions on Intelligent Transportation Systems version are described in `REPRODUCE_TITS.txt` and produced by `code/driver_outcomes.py` and `code/rolling_horizon.py`. Outputs are in `results/tits/`.
