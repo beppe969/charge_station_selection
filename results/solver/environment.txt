@@ -1,0 +1,11 @@
+MATLAB 9.8.0.1323502 (R2020a)
+Optimization Toolbox 8.5
+Architecture MACI64
+CPU x86 Family 6 Model 85 Stepping 4, GenuineIntel
+System memory (bytes) 68719476736
+MATLAB computational threads 8
+seed 31027 (twister)
+repetitions 5
+Original budget-row LP 7, original MILP and reduced LP 11 (one-EV example).
+12 structurally generated full-service instances agree across original MILP, filtered LP and matchpairs.
+Additional exact checks cover tied, rectangular, square, empty, infeasible and high-cost inputs.

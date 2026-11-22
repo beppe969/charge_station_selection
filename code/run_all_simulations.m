@@ -1,28 +1,11 @@
 function summary = run_all_simulations(RUN_CALIBRATION, figDir)
-% RUN_ALL_SIMULATIONS  Reproduce every experiment of the paper, in order.
+% RUN_ALL_SIMULATIONS  Run the historical MATLAB experiments.
+% Use run_revised.py for the revised manuscript's numerical studies.
+% See the package README for commands and result files.
 %
-% Luca Ambrosino, Politecnico di Torino.
-% "A Matching-Theoretic Approach to Optimal Charging Station Selection for
-% Electric Vehicles".
-%
-%   run_all_simulations                 % skip the calibration, use the shipped weights
-%   run_all_simulations(true)           % re-run the calibration from scratch
-%   run_all_simulations(false, 'C:\temp\EVfigures')
-%
-% The whole thing takes a couple of hours. Most of it goes into time_scaling,
-% which solves a mixed-integer program at eight sizes, and into the three real
-% networks, which solve a hundred assignment problems each. If you only want
-% one result, run that script alone: the header of each says which section of
-% the paper it produces, and the table in README.tex lists the mapping.
-%
-% Order matters in exactly one place. calibration_pareto writes
-% calibrated_alpha.mat and every later script reads the two coefficients from
-% it, so the calibration has to come first if you run it at all. A copy of
-% that file ships with the package, which is why the default is to skip it
-% and still land on the numbers printed in the paper.
-%
-% Each script is called inside try/catch, so one failure does not abort the
-% rest of the run; the summary at the end says what passed and what did not.
+% run_all_simulations(false,figDir) uses the shipped reference weights.
+% run_all_simulations(true,figDir) first recomputes the synthetic weights.
+% Section and figure numbers in the run log refer to the original draft.
 
     if nargin < 1 || isempty(RUN_CALIBRATION),  RUN_CALIBRATION = false;  end
     if nargin < 2,                              figDir = '';              end
@@ -50,8 +33,8 @@ function summary = run_all_simulations(RUN_CALIBRATION, figDir)
     % Everything listed here ships with the package, so a miss means the
     % folder was flattened or only part of it was copied.
     needed = {'build_objective_matrix', 'objective_weights', ...
-              'hungarian_assignment_binary', 'hungarian_assignment_sparse', ...
-              'munkres', 'hopcroft_karp', 'draw_port_power', ...
+              'hungarian_assignment_binary', 'matchpairs_assignment', 'assignment_edge_costs', ...
+              'munkres', 'hopcroft_karp', 'draw_port_power', 'filtered_assignment_program', ...
               'greedy_nearest_assignment', 'greedy_cheapest_k_nearest', ...
               'greedy_cost_assignment', 'pareto_knee_from_table'};
     missing = needed(cellfun(@(f) exist(f, 'file') ~= 2, needed));

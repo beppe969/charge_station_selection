@@ -1,63 +1,56 @@
 function results = time_scaling(figdir, measureCvxOverhead)
-% TIME_SCALING  Runtime of four exact methods against problem size (Sec. 3.4.2).
-%
-% MILP called directly through the solver API, its LP relaxation, the dense
-% Hungarian and the sparse one. CVX is timed separately, and plotted
-% differently, because its number includes parsing and canonicalisation: in
-% the first version of this experiment that overhead was most of what we
-% were attributing to branch and bound.
-%
-% Two things worth remembering if you touch this file.
-%   - Feasibility is checked with hopcroft_karp BEFORE solving. The
-%     forbidden pairs carry a large but FINITE penalty, so on an infeasible
-%     instance the Hungarian returns a full assignment that quietly uses
-%     them. Counting assigned vehicles detects nothing.
-%   - The exponent on the x axis is in M*N, not in n = max(M,N). Since
-%     M is proportional to N here, a cubic method shows a slope of 1.5.
-%
-% Produces time_vs_size.pdf, cost_vs_size.pdf and speedup.pdf.
-
+% TIME_SCALING  Historical R2023b implementation benchmark.
+% The dense Munkres routine and dense-input MATLAB matchpairs are distinct
+% implementations. The LP/MILP paths here allocate all M*N variables. Use
+% verify_assignment to benchmark identical allowed graphs across densities
+% with eligible-edge LP/MILP models and dense/sparse matchpairs inputs.
+% CVX timings include model construction. Its total time minus a direct
+% solve measures a difference between end-to-end routes, not parsing alone.
 
 if nargin < 1,  figdir = '';  end
 if nargin < 2 || isempty(measureCvxOverhead),  measureCvxOverhead = true;  end
 
 rng(1);
 
-BIGM = 1e6;   % penalty used to forbid the non-acceptable pairs
 
 %% ------------------------------------------------------------------
 %  Which solver interface is available
 %  ------------------------------------------------------------------
-% Preference goes to the direct Mosek interface, because it is the one the
-% MILP timings in the paper are based on. intlinprog is a fully acceptable
-% substitute and keeps the script runnable without a commercial licence.
-
-useMosek = (exist('mosekopt', 'file') == 2 || exist('mosekopt', 'file') == 3);
-if useMosek
-    solverName = 'Mosek (mosekopt, direct)';
-elseif exist('intlinprog', 'file') == 2
+% Optimization Toolbox gives the same mathematical LP/MILP without a
+% third-party license. Keep the original MOSEK path as a fallback.
+useMosek = exist('intlinprog','file') ~= 2;
+if ~useMosek
     solverName = 'intlinprog / linprog (direct)';
+elseif any(exist('mosekopt','file') == [2,3])
+    solverName = 'Mosek (mosekopt, direct)';
 else
-    error(['Neither mosekopt nor intlinprog was found. One of the two is ' ...
-           'needed to time the MILP and its relaxation directly.']);
+    error('Install Optimization Toolbox or a licensed MOSEK solver.');
 end
 
 useCvx = measureCvxOverhead && (exist('cvx_begin', 'file') == 2);
 if useCvx
-    % Mosek is what the reported CVX timings used. If CVX is installed but
-    % Mosek is not, fall back to whatever CVX has rather than aborting: the
-    % point of this curve is the size of the modelling overhead, and that is
-    % not specific to one solver.
+    configuredSolver = '';
     try
+        configuredSolver = cvx_solver;
         cvx_solver mosek
         cvx_solver_settings('MSK_IPAR_OPTIMIZER', 'MSK_OPTIMIZER_FREE_SIMPLEX')
     catch ME
-        warning('Could not select Mosek under CVX (%s); using the CVX default.', ...
-                ME.message);
+        if ~isempty(configuredSolver) && ~strcmpi(cvx_solver, configuredSolver)
+            cvx_solver(configuredSolver);
+        end
+        % CVX supports integer variables with these solvers. Numbered names
+        % denote additional installations (for example, Gurobi_2).
+        solverFamily = regexprep(lower(configuredSolver), '_[0-9]+$', '');
+        useCvx = any(strcmp(solverFamily, {'gurobi', 'glpk', 'mosek'}));
+        if useCvx
+            warning('MOSEK setup failed (%s). Using CVX solver %s.', ME.message, configuredSolver);
+        else
+            warning('Skipping the optional CVX integer timing after MOSEK setup failed (%s).', ME.message);
+        end
     end
 end
 
-use_sparse = (exist('hungarian_assignment_sparse', 'file') == 2);
+use_matchpairs = exist('matchpairs', 'file') == 2;
 
 %% ------------------------------------------------------------------
 %  Simulation parameters
@@ -91,7 +84,7 @@ fprintf('  platform      : %s, %d physical cores, %d computational threads\n', .
 fprintf('  MATLAB        : %s\n', env.matlab);
 fprintf('  MILP solver   : %s\n', env.solver);
 fprintf('  CVX overhead  : %s\n', ternary_str(useCvx, 'measured', 'not measured'));
-fprintf('  sparse Hung.  : %s\n', ternary_str(use_sparse, 'included', 'not found'));
+fprintf('  matchpairs    : %s\n', ternary_str(use_matchpairs, 'included', 'not found'));
 fprintf('  sizes         : N from %d to %d, M = 1.2 N, %d repetitions\n', ...
         N_vec(1), N_vec(end), REPS);
 fprintf('=================================================\n\n');
@@ -101,8 +94,8 @@ SIM = numel(N_vec);
 % Results table, one row per size. The column map is used below and again
 % when the table is displayed, so it is written out once here.
 %  1 M | 2 N | 3 M*N
-%  4 t_MILP_direct | 5 t_LP_direct | 6 t_hung | 7 t_sparse | 8 t_MILP_cvx
-%  9 cost_MILP | 10 cost_LP | 11 cost_hung | 12 cost_sparse
+%  4 t_MILP_direct | 5 t_LP_direct | 6 t_hung | 7 t_matchpairs | 8 t_MILP_cvx
+%  9 cost_MILP | 10 cost_LP | 11 cost_hung | 12 cost_matchpairs
 % 13 costs agree | 14 t_munkres | 15 LP integrality residual
 results_mat = nan(SIM, 15);
 
@@ -130,16 +123,7 @@ for s = 1:SIM
 
         A = double(rand(M, N) < p_acc);         % acceptable matrix
 
-        % FEASIBILITY IS CHECKED BEFORE SOLVING, AND THIS IS NOT OPTIONAL.
-        % The Hungarian algorithm is given the forbidden pairs as a large
-        % finite penalty rather than as an infinity, so on an infeasible
-        % instance it does not fail: it returns a complete assignment that
-        % quietly uses forbidden pairs at cost BIGM. Cardinality alone
-        % therefore cannot detect infeasibility. A maximum-cardinality
-        % matching settles the question in O(|E| sqrt(M+N)), before any
-        % cost is computed. At p = 0.6 and these sizes infeasibility
-        % practically never occurs, but the test costs nothing and is what
-        % makes the comparison well posed.
+        % All four solvers are compared on EV-saturating instances.
         [~, num_matches] = hopcroft_karp(A);
         if num_matches < N
             continue;
@@ -170,34 +154,31 @@ for s = 1:SIM
                     sum(x,2) <= 1;
                     x <= A;
             cvx_end
+            assert(strcmp(cvx_status,'Solved'),'CVX solve failed: %s',cvx_status);
             tCvx(r) = toc;
         end
 
         % ---------------- dense Hungarian ----------------
-        H = c;
-        H(~A) = BIGM;
 
         tic
-        [assignments, ~, ~, run_time] = hungarian_assignment_binary(A, H);
+        [assignments, ~, ~, run_time] = hungarian_assignment_binary(A, c);
         tH(r) = toc;
         tMunk(r) = run_time;
 
         assignments = full(double(assignments));
-        % Guard against the big-M pitfall described above: if any forbidden
-        % pair were used, the cost would be meaningless.
-        assert(~any(~A(logical(assignments))), ...
+        assert(nnz(assignments) == N && ~any(~A(logical(assignments))), ...
                'The dense Hungarian used a forbidden pair: instance infeasible.');
         cH(r) = sum(sum(c .* assignments));
 
-        % ---------------- sparse Hungarian ----------------
-        if use_sparse
+        % ---------------- dense-input matchpairs ----------------
+        if use_matchpairs
             tic
-            assignments_sparse = hungarian_assignment_sparse(A, H);
+            assignments_builtin = matchpairs_assignment(A, c);
             tS(r) = toc;
-            assignments_sparse = full(double(assignments_sparse));
-            assert(~any(~A(logical(assignments_sparse))), ...
-                   'The sparse Hungarian used a forbidden pair.');
-            cS(r) = sum(sum(c .* assignments_sparse));
+            assignments_builtin = full(double(assignments_builtin));
+            assert(nnz(assignments_builtin) == N && ~any(~A(logical(assignments_builtin))), ...
+                   'The dense-input matchpairs used a forbidden pair.');
+            cS(r) = sum(sum(c .* assignments_builtin));
         end
     end
 
@@ -218,15 +199,15 @@ for s = 1:SIM
 
     % Do all the methods agree on the optimal cost, at every repetition?
     agree = max(abs(cMd - cH)) < 1e-6 && max(abs(cMd - cLP)) < 1e-6;
-    if use_sparse
+    if use_matchpairs
         agree = agree && (max(abs(cMd - cS)) < 1e-6);
     end
     results_mat(s,13) = agree;
 
     fprintf(['M = %4d, N = %4d | MILP %7.3f s | LP %7.3f s | Hung %7.3f s'], ...
             M, N, results_mat(s,4), results_mat(s,5), results_mat(s,6));
-    if use_sparse
-        fprintf(' | sparse %7.3f s', results_mat(s,7));
+    if use_matchpairs
+        fprintf(' | matchpairs %7.3f s', results_mat(s,7));
     end
     if useCvx
         fprintf(' | CVX %7.3f s', results_mat(s,8));
@@ -247,14 +228,14 @@ xv = results_mat(:,3);
 pM = fit_slope(xv, results_mat(:,4));
 pL = fit_slope(xv, results_mat(:,5));
 pH = fit_slope(xv, results_mat(:,6));
-pS = NaN;  if use_sparse,  pS = fit_slope(xv, results_mat(:,7));  end
+pS = NaN;  if use_matchpairs,  pS = fit_slope(xv, results_mat(:,7));  end
 
 fprintf('\nEmpirical growth in M*N:\n');
 fprintf('  MILP (direct)     ~ (M N)^%.2f\n', pM);
 fprintf('  LP relaxation     ~ (M N)^%.2f\n', pL);
 fprintf('  Hungarian (dense) ~ (M N)^%.2f\n', pH);
-if use_sparse
-    fprintf('  Hungarian (sparse)~ (M N)^%.2f\n', pS);
+if use_matchpairs
+    fprintf('  matchpairs (dense input)~ (M N)^%.2f\n', pS);
 end
 
 fprintf('\nLargest deviation of the LP solution from {0,1}: %.2e\n', ...
@@ -263,8 +244,8 @@ fprintf('(total unimodularity predicts an integral vertex; this measures it)\n')
 
 if useCvx
     ovh = 1 - results_mat(:,4) ./ results_mat(:,8);
-    fprintf(['\nShare of the CVX time that is modeling overhead rather than ' ...
-             'solving: %.0f%% to %.0f%%\n'], 100*min(ovh), 100*max(ovh));
+    fprintf(['\nDifference between CVX and direct wall times as a share of ' ...
+             'CVX time: %.0f%% to %.0f%%\n'], 100*min(ovh), 100*max(ovh));
 end
 
 %% ------------------------------------------------------------------
@@ -283,10 +264,10 @@ plot(xv, results_mat(:,5), '-v', 'LineWidth', 1.8, 'MarkerSize', 7, ...
 plot(xv, results_mat(:,6), '-s', 'LineWidth', 1.8, 'MarkerSize', 7, ...
      'MarkerFaceColor', 'w', ...
      'DisplayName', sprintf('Hungarian, dense (slope %.2f)', pH));
-if use_sparse
+if use_matchpairs
     plot(xv, results_mat(:,7), '-^', 'LineWidth', 1.8, 'MarkerSize', 7, ...
          'MarkerFaceColor', 'w', ...
-         'DisplayName', sprintf('Hungarian, sparse (slope %.2f)', pS));
+         'DisplayName', sprintf('matchpairs, dense input (slope %.2f)', pS));
 end
 if useCvx
     % Dashed and grey, because it is a different kind of quantity: it
@@ -321,9 +302,9 @@ if any(badIdx)
     plot(xv(badIdx), results_mat(badIdx,11), 'rx', 'MarkerSize', 10, ...
          'LineWidth', 1.8, 'DisplayName', 'MISMATCH');
 end
-if use_sparse
+if use_matchpairs
     plot(xv, results_mat(:,12), 'g:', 'LineWidth', 1.8, ...
-         'DisplayName', 'Hungarian, sparse');
+         'DisplayName', 'matchpairs, dense input');
 end
 
 xlabel('Problem size M \times N');
@@ -336,9 +317,9 @@ relGap  = abs(results_mat(:,9) - results_mat(:,11)) ./ abs(results_mat(:,9));
 relGapL = abs(results_mat(:,9) - results_mat(:,10)) ./ abs(results_mat(:,9));
 fprintf('\nWorst relative cost gap, MILP vs dense Hungarian : %.2e\n', max(relGap));
 fprintf('Worst relative cost gap, MILP vs LP relaxation   : %.2e\n', max(relGapL));
-if use_sparse
+if use_matchpairs
     relGapS = abs(results_mat(:,9) - results_mat(:,12)) ./ abs(results_mat(:,9));
-    fprintf('Worst relative cost gap, MILP vs sparse Hungarian: %.2e\n', max(relGapS));
+    fprintf('Worst relative cost gap, MILP vs dense-input matchpairs: %.2e\n', max(relGapS));
 end
 
 %% ------------------------------------------------------------------
@@ -351,9 +332,9 @@ subplot(1,2,1);
 hold on; grid on; box on;
 plot(xv, results_mat(:,4) ./ results_mat(:,6), '-d', 'LineWidth', 1.8, ...
      'MarkerSize', 7, 'MarkerFaceColor', 'w', 'DisplayName', 'dense Hungarian');
-if use_sparse
+if use_matchpairs
     plot(xv, results_mat(:,4) ./ results_mat(:,7), '-^', 'LineWidth', 1.8, ...
-         'MarkerSize', 7, 'MarkerFaceColor', 'w', 'DisplayName', 'sparse Hungarian');
+         'MarkerSize', 7, 'MarkerFaceColor', 'w', 'DisplayName', 'dense-input matchpairs');
 end
 plot(xv, results_mat(:,4) ./ results_mat(:,5), '-v', 'LineWidth', 1.4, ...
      'MarkerSize', 6, 'MarkerFaceColor', 'w', 'DisplayName', 'LP relaxation');
@@ -371,8 +352,8 @@ if useCvx
     set(gca, 'XTick', 1:SIM, 'XTickLabel', compose('%d', results_mat(:,2)));
     grid on;  ylim([0 100]);
     xlabel('Number of vehicles N');
-    ylabel('Modeling overhead [% of the CVX time]');
-    title('What CVX spends outside the solver');
+    ylabel('CVX minus direct [% of CVX time]');
+    title('Difference between timing protocols');
 else
     axis off;
     text(0.5, 0.5, {'CVX overhead not measured', ...
@@ -397,19 +378,25 @@ if ~isempty(figdir)
     end
 end
 
+% Historical table field t_Sparse (and cost_Sparse) refers to dense-input matchpairs.
 T = array2table(results_mat, 'VariableNames', ...
     {'M','N','MN','t_MILP','t_LP','t_Hung','t_Sparse','t_CVX', ...
      'cost_MILP','cost_LP','cost_Hung','cost_Sparse','agree', ...
      't_munkres','LP_int_residual'});
-disp(T);
+displayTable = T;
+displayTable.Properties.VariableNames{'t_Sparse'} = 't_MatchpairsDense';
+displayTable.Properties.VariableNames{'cost_Sparse'} = 'cost_MatchpairsDense';
+disp(displayTable);
 
 results.table          = T;
 results.raw            = results_mat;
 results.slope_MILP     = pM;
 results.slope_LP       = pL;
 results.slope_Hung     = pH;
+results.slope_MatchpairsDense = pS;
 results.slope_Sparse   = pS;
-results.use_sparse     = use_sparse;
+results.use_matchpairs = use_matchpairs;
+results.use_sparse = use_matchpairs; % backwards-compatible name for this implementation
 results.cvx_measured   = useCvx;
 results.REPS           = REPS;
 results.environment    = env;
@@ -469,16 +456,19 @@ function [x, t] = solve_direct(c, A, integer, useMosek)
         end
 
         t0 = tic;
-        [~, res] = mosekopt(cmd, prob, param);
+        [status, res] = mosekopt(cmd, prob, param);
         t = toc(t0);
-
+        assert(status == 0 && isfield(res,'sol'),'MOSEK did not return a solution.');
         if integer
-            xx = res.sol.int.xx;
-        elseif isfield(res.sol, 'bas')
-            xx = res.sol.bas.xx;
+            sol = res.sol.int;
+        elseif isfield(res.sol,'bas')
+            sol = res.sol.bas;
         else
-            xx = res.sol.itr.xx;
+            sol = res.sol.itr;
         end
+        assert(any(strcmp(sol.solsta,{'OPTIMAL','INTEGER_OPTIMAL'})), ...
+               'MOSEK did not certify an optimal objective.');
+        xx = sol.xx;
     else
         opts = optimoptions('intlinprog', 'Display', 'off');
         Aeq  = Amat(1:N, :);        beq = ones(N,1);
@@ -487,20 +477,23 @@ function [x, t] = solve_direct(c, A, integer, useMosek)
         if integer
             intcon = find(bux > 0)';
             t0 = tic;
-            xx = intlinprog(c(:), intcon, Aub, bub, Aeq, beq, blx, bux, opts);
+            [xx,~,flag] = intlinprog(c(:), intcon, Aub, bub, Aeq, beq, blx, bux, opts);
             t  = toc(t0);
         else
             lopts = optimoptions('linprog', 'Display', 'off');
             t0 = tic;
-            xx = linprog(c(:), Aub, bub, Aeq, beq, blx, bux, lopts);
+            [xx,~,flag] = linprog(c(:), Aub, bub, Aeq, beq, blx, bux, lopts);
             t  = toc(t0);
         end
+        assert(flag == 1,'The direct solver did not certify an optimum.');
     end
 
     x = reshape(full(xx), M, N);
     if integer
         x = round(x);
     end
+    assert(~any(x(~A)>1e-6) && all(abs(sum(x,1)-1)<1e-6) && all(sum(x,2)<=1+1e-6), ...
+           'Direct solution violates the assignment constraints.');
 end
 
 

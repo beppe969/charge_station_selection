@@ -1,25 +1,10 @@
 function results = feasibility_sweep(csvFile, figdir, cityTag, REPS)
-% FEASIBILITY_SWEEP  Where the feasible region ends (Sec. 4.2).
+% FEASIBILITY_SWEEP  Legacy MATLAB feasibility diagnostic on unrepaired snapshots.
+% Reuses the same random layouts, prices and EV ranks at every point of the
+% range/budget grid. Each graph is tested by maximum matching. For the
+% revised manuscript's experiment, intervals and held-out infrastructure
+% interventions, run planning_study.py.
 %
-%   results = feasibility_sweep(csvFile, figdir, cityTag, REPS)
-%
-% The case studies fix Rmax = 5 km and repair stranded vehicles, so
-% feasibility is never actually tested there. Here it is the output: the
-% repair is switched off and the two quantities that build the acceptable
-% matrix are swept, the driving range and the willingness to pay.
-%
-% For every layout we record whether an EV-saturating matching exists
-% (Hopcroft-Karp), whether the sufficient condition certifies it, whether
-% the necessary prefix condition is satisfied, and, when it fails, which of
-% the two resources is binding. That last one is what makes the theory
-% useful for planning rather than just for verification.
-%
-% The budget band must stay above the cheapest tariff. Below it, some
-% vehicles can afford nothing at all and the instance is infeasible at any
-% driving range, which would measure the sampling convention and not the
-% competition for cheap ports.
-
-
     if nargin < 2 || isempty(figdir),  figdir  = 'Figures';  end
     if nargin < 4 || isempty(REPS),    REPS    = 25;         end
     if nargin < 3 || isempty(cityTag)
@@ -37,7 +22,6 @@ function results = feasibility_sweep(csvFile, figdir, cityTag, REPS)
 %  ==================================================================
 
 load_ratio = 0.5;        % N / M, as in the case studies
-Qrange     = [20 60];    % energy demand per EV [kWh]
 sigmaKm    = 2.5;        % Gaussian spread of the EV density
 halfBand   = 0.10;       % rho_j is drawn uniformly on rhoBar +/- halfBand
 
@@ -62,9 +46,7 @@ rhoBarGrid = [0.42 0.46 0.50 0.55 0.60];        % [$/kWh]
 
 rhoNominal = 0.50;       % the band used in the case studies is 0.40-0.60
 Cmin = 0.303;  Cmax = 0.530;                    % [$/kWh]
-pow_level1 = 7;  pow_level2 = 19;  pow_dcfast = 50;   % [kW]
 
-rng(7, 'twister');       % so the grid is reproducible
 
 %% ==================================================================
 %  PART 0: load the network and expand the stations into ports
@@ -155,7 +137,7 @@ pNoStranded     = zeros(nR, nRho);
 pFeasNoStranded = zeros(nR, nRho);
 bindReach = zeros(nR, nRho);   % of the infeasible ones, share where range binds
 bindAfford= zeros(nR, nRho);   % ... where affordability binds
-bindBoth  = zeros(nR, nRho);   % ... where neither alone would be enough
+bindBoth  = zeros(nR, nRho);   % ... both single relaxations work, or neither works
 
 tStart = tic;
 for a = 1:nR
@@ -170,6 +152,9 @@ for a = 1:nR
         nNoStr = 0;  nFeasNoStr = 0;
 
         for r = 1:REPS
+            % The seed belongs to the layout, so every cell uses the same
+            % positions, tariffs and willingness-to-pay ranks.
+            rng(7 + r, 'twister');
             [evLat, evLon] = sample_ev_positions(hullPoly, centLat, centLon, ...
                                                  N, sigmaKm);
             D = haversine_matrix(portLat, portLon, evLat, evLon);   % M x N
@@ -178,7 +163,6 @@ for a = 1:nR
             statC = Cmin + (Cmax - Cmin) * rand(nStations,1);
             C     = statC(portStation);                             % M x 1
 
-            Q     = Qrange(1) + diff(Qrange) * rand(1,N);           % 1 x N
             ratio = rhoLo + (rhoHi - rhoLo) * rand(1,N);            % 1 x N
 
             Rmat  = D <= Rmax;                                      % M x N
@@ -272,15 +256,16 @@ end
 totInf   = sum(pInfeas(:)) * REPS;
 totFeas  = numel(pInfeas) * REPS - totInf;
 certFeas = sum(pSuffCert(:)) * REPS;
-missInf  = sum(pPrefixOK(:) .* pInfeas(:)) * REPS;   % infeasible but passing
+detectedInf = sum(1 - pPrefixOK(:)) * REPS;  % a failed necessary test implies infeasibility
 fprintf('\n--- Tightness of the two bounds, over the whole grid ---\n');
 fprintf('  feasible instances certified by the sufficient condition : %.1f%%\n', ...
         100 * certFeas / max(totFeas,1));
 fprintf('  infeasible instances detected by the prefix condition    : %.1f%%\n', ...
-        100 * (totInf - missInf) / max(totInf,1));
+        100 * detectedInf / max(totInf,1));
 fprintf('  of the infeasible ones: range binds %.0f%%, budget binds %.0f%%, ', ...
-        100*mean(bindReach(pInfeas>0)), 100*mean(bindAfford(pInfeas>0)));
-fprintf('interaction %.0f%%\n', 100*mean(bindBoth(pInfeas>0)));
+        100 * sum(bindReach(:).*pInfeas(:)) * REPS / max(totInf,1), ...
+        100 * sum(bindAfford(:).*pInfeas(:)) * REPS / max(totInf,1));
+fprintf('mixed or joint %.0f%%\n', 100 * sum(bindBoth(:).*pInfeas(:)) * REPS / max(totInf,1));
 
 %% ==================================================================
 %  PART 3: figure
@@ -289,8 +274,11 @@ fprintf('interaction %.0f%%\n', 100*mean(bindBoth(pInfeas>0)));
 fig = figure('Color','w','Position',[100 100 1000 380]);
 
 subplot(1,2,1);
-imagesc(rhoBarGrid, RmaxGrid, 100*(1-pInfeas));
-set(gca,'YDir','normal');
+% Index coordinates place every tested grid point at a cell centre,
+% including the nonuniform increments in radius and budget.
+imagesc(1:nRho, 1:nR, 100*(1-pInfeas));
+set(gca,'YDir','normal', 'XTick',1:nRho,'XTickLabel',compose('%.2f',rhoBarGrid), ...
+    'YTick',1:nR,'YTickLabel',compose('%.1f',RmaxGrid));
 colormap(gca, parula);  caxis([0 100]);
 cb = colorbar;  cb.Label.String = 'feasible layouts [%]';
 xlabel('centre of the willingness to pay band [$/kWh]');
@@ -301,11 +289,11 @@ hold on;
 frontier = nan(1, nRho);
 for b = 1:nRho
     k = find(pInfeas(:,b) == 0, 1, 'first');
-    if ~isempty(k),  frontier(b) = RmaxGrid(k);  end
+    if ~isempty(k),  frontier(b) = k;  end
 end
-plot(rhoBarGrid, frontier, 'o-', 'LineWidth', 1.8, 'Color', [0.85 0.2 0.1], ...
+plot(1:nRho, frontier, 'o-', 'LineWidth', 1.8, 'Color', [0.85 0.2 0.1], ...
      'MarkerFaceColor', 'w');
-legend({'smallest feasible range'}, 'Location','northeast', 'Box','off');
+legend({'First tested range with all layouts feasible'}, 'Location','northeast', 'Box','off');
 hold off;
 
 subplot(1,2,2);

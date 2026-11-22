@@ -1,0 +1,41 @@
+policy,geometry,metric,street_minus_planar,lower95,upper95
+Batch cost,Street,service_pct,-1.328273245,-1.461100569,-1.182795699
+Batch cost,Street,service_deficit_pp,0,0,0
+Batch cost,Street,distance_km,0.5049917127,0.4933811865,0.5183106277
+Batch cost,Street,cost_saving_pct,0,0,0
+Batch cost,Connected core,service_pct,-0.03162555345,-0.0569259962,-0.006325110689
+Batch cost,Connected core,service_deficit_pp,0,0,0
+Batch cost,Connected core,distance_km,0.4743295396,0.4639878851,0.4854023423
+Batch cost,Connected core,cost_saving_pct,0,0,0
+Batch distance,Street,service_pct,-1.328273245,-1.461100569,-1.182795699
+Batch distance,Street,service_deficit_pp,0,0,0
+Batch distance,Street,distance_km,0.4700314875,0.4596086786,0.4812116997
+Batch distance,Street,cost_saving_pct,0.3889085617,0.1296540589,0.6339124998
+Batch distance,Connected core,service_pct,-0.03162555345,-0.0569259962,-0.006325110689
+Batch distance,Connected core,service_deficit_pp,0,0,0
+Batch distance,Connected core,distance_km,0.4439499568,0.4366994054,0.4514827612
+Batch distance,Connected core,cost_saving_pct,0.2830526637,0.04191585932,0.5184492834
+Sequential cost,Street,service_pct,-1.574952562,-1.726755218,-1.414663715
+Sequential cost,Street,service_deficit_pp,0.2466793169,0.1918616909,0.3057663926
+Sequential cost,Street,distance_km,0.4843249015,0.4734729764,0.4960548483
+Sequential cost,Street,cost_saving_pct,-0.05545596023,-0.1205617134,0.0134736921
+Sequential cost,Connected core,service_pct,-0.265654649,-0.3267973856,-0.210837023
+Sequential cost,Connected core,service_deficit_pp,0.2340290955,0.1813198398,0.2972802024
+Sequential cost,Connected core,distance_km,0.4575211432,0.448309915,0.4675254911
+Sequential cost,Connected core,cost_saving_pct,-0.08004787424,-0.1511384982,-0.000404147378
+Nearest,Street,service_pct,-1.781572844,-1.958675943,-1.606525406
+Nearest,Street,service_deficit_pp,0.4532995994,0.36685642,0.5524457095
+Nearest,Street,distance_km,0.4714429696,0.4611882726,0.4823274808
+Nearest,Street,cost_saving_pct,0.5197601433,0.2725557343,0.7528456998
+Nearest,Connected core,service_pct,-0.4005903437,-0.4828167826,-0.3246890154
+Nearest,Connected core,service_deficit_pp,0.3689647902,0.2951718322,0.4512439384
+Nearest,Connected core,distance_km,0.4478999393,0.4403428372,0.4557220553
+Nearest,Connected core,cost_saving_pct,0.3672100264,0.1311117898,0.5952544714
+Cheapest of three,Street,service_pct,-1.722538478,-1.886991356,-1.5580856
+Cheapest of three,Street,service_deficit_pp,0.394265233,0.3289057559,0.4659498208
+Cheapest of three,Street,distance_km,0.5136810321,0.5025311883,0.524695014
+Cheapest of three,Street,cost_saving_pct,0.2593132655,0.0120500726,0.4908911917
+Cheapest of three,Connected core,service_pct,-0.4026987139,-0.468058191,-0.341503268
+Cheapest of three,Connected core,service_deficit_pp,0.3710731604,0.312038794,0.4364326376
+Cheapest of three,Connected core,distance_km,0.4891146234,0.4798161577,0.4982971202
+Cheapest of three,Connected core,cost_saving_pct,0.1378454014,-0.09884668363,0.3641883806

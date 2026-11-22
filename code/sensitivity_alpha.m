@@ -1,4 +1,6 @@
 function S = sensitivity_alpha(csvFile, figdir)
+% Legacy MATLAB exploration. The revised manuscript and its paired uncertainty
+% estimates are reproduced by revised_city_study.py.
 % SENSITIVITY_ALPHA  Does the result survive the coefficients? (Sec. 4.4)
 %
 % Re-solves the SAME instances of one real network at every point of a wide
@@ -34,7 +36,7 @@ sigmaKm = 2.5;
 REPS    = 20;           % instances per setting
 ORDERS  = 5;            % random processing orders for the greedy policy
 
-pow_level1 = 7;  pow_level2 = 19;  pow_dcfast = 50;
+pow_level1 = 1.4;  pow_level2 = 7.2;  pow_dcfast = 50;
 
 % The sweep. alpha_1 spans a factor of about three hundred, which brackets
 % any defensible generalised cost of an urban kilometre; alpha_3 takes a
@@ -53,11 +55,7 @@ alphaTime = unique([0.15 0.35 0.70,              alphaStarNow.time]); % [$/min]
 fprintf(['Calibrated setting included in the sweep: alpha_1 = %.3f $/km, ' ...
          'alpha_3 = %.3f $/min\n'], alphaStarNow.dist, alphaStarNow.time);
 
-if exist('hungarian_assignment_sparse', 'file') == 2
-    solve_fun = @hungarian_assignment_sparse;
-else
-    solve_fun = @hungarian_assignment_binary;
-end
+solve_fun = @matchpairs_assignment;
 
 %% ------------------------------------------------- load and expand network
 assert(isfile(csvFile), 'Cannot find %s', csvFile);
@@ -122,12 +120,6 @@ for r = 1:REPS
     Q   = Qrange(1) + (Qrange(2)-Qrange(1))*rand(1,N);
     rho = rhoMin + (rhoMax-rhoMin)*rand(1,N);   % [$/kWh], budget = rho.*Q
     A   = (D <= Rmax_km) & (C <= repmat(rho, M, 1));
-    % Repair the vehicles left with no acceptable port, as in the main study
-    for j = find(~any(A,1))
-        aff = find(C <= rho(j));
-        [~, k] = min(D(aff, j));
-        A(aff(k), j) = true;
-    end
     ord = zeros(ORDERS, N);
     for o = 1:ORDERS, ord(o,:) = randperm(N); end
     inst{r} = struct('D',D,'C',C,'W',W,'A',A,'ord',ord,'Q',Q);
@@ -141,63 +133,45 @@ relD  = nan(nD, nT);    % optimum distance relative to greedy        [%]
 relC  = nan(nD, nT);    % optimum price    relative to greedy        [%]
 relW  = nan(nD, nT);    % optimum wait     relative to greedy        [%]
 
+relBill = nan(nD,nT); relDowntime = nan(nD,nT);
 for a = 1:nD
   for b = 1:nT
         alpha = struct('dist', alphaDist(a), 'price', 1, 'time', alphaTime(b));
-        [g, rd, rc, rw] = deal(zeros(REPS,1));
+        [g, rd, rc, rw, rb, rt] = deal(nan(REPS,1));
         for r = 1:REPS
             I = inst{r};
             c = build_objective_matrix(I.D, I.W, I.C, portPow, I.Q, alpha);
 
-            % optimum. The solver takes the acceptable matrix FIRST and the
-            % cost matrix second, consistently with the rest of the suite.
-            H = c;  H(~I.A) = 1e6;                 % forbid the non-acceptable pairs
-            xo = full(double(solve_fun(I.A, H)));
-            % The penalty on the forbidden pairs is large but finite, so an
-            % infeasible instance yields a complete assignment that uses
-            % them rather than a failure. Checking the cardinality alone
-            % would therefore never detect anything.
-            if nnz(xo) < N || any(~I.A(logical(xo)))
-                error(['The solver served %d of %d vehicles, or used a ' ...
-                       'forbidden pair, on an instance verified as feasible.'], ...
-                      nnz(xo), N);
-            end
-
-            % Greedy nearest, averaged over the processing orders.
-            %
-            % EVERYTHING IS PER SERVED VEHICLE, AND THIS MATTERS. The greedy
-            % policy occasionally leaves a vehicle unserved: it commits ports
-            % one at a time, so a vehicle processed late whose acceptable set
-            % is small can find all of it taken. It is a genuine property of
-            % the policy, not a defect of the instance, and the optimum serves
-            % everyone on the same instance by construction. Comparing TOTALS
-            % would then be biased in favour of the greedy, whose sum simply
-            % runs over fewer terms, to the point that the gap can come out
-            % negative, which is impossible. Dividing each quantity by the
-            % number of vehicles it actually covers removes the bias exactly
-            % and leaves a quantity that is anyway easier to read: the cost
-            % borne by one vehicle.
-            og = 0;  dg = 0;  cg = 0;  wg = 0;  ng = 0;
+            % Compare each sequential order against the exact allocation of
+            % the same EVs. The physical quantities are computed on this
+            % fixed cohort, including on layouts without a full matching.
+            bill = I.C * I.Q;
+            downtime = I.W + 60 .* I.Q ./ portPow;
+            rel = nan(ORDERS, 6);
             for o = 1:ORDERS
-                xg = full(greedy_nearest_assignment(I.D, I.A, I.ord(o,:)));
-                nServed   = nnz(xg);
-                nUnserved = nUnserved + (N - nServed);
-                og = og + sum(c .* xg, 'all')               / nServed;
-                dg = dg + sum(I.D .* xg, 'all')             / nServed;
-                cg = cg + sum(repmat(I.C,1,N) .* xg, 'all') / nServed;
-                wg = wg + sum(repmat(I.W,1,N) .* xg, 'all') / nServed;
+                xg = logical(greedy_nearest_assignment(I.D, I.A, I.ord(o,:)));
+                served = any(xg, 1);
+                nUnserved = nUnserved + nnz(~served);
+                if ~any(served), continue; end
+                xb = false(M,N);
+                xb(:,served) = logical(solve_fun(I.A(:,served), c(:,served)));
+                assert(nnz(xb) == nnz(served) && all(I.A(xb)), 'Invalid cohort assignment');
+                cg = sum(c(xg)); cb = sum(c(xb));
+                chosen_g = sum(xg,2); chosen_b = sum(xb,2);
+                dg = sum(I.D(xg)); db = sum(I.D(xb));
+                pg = I.C' * chosen_g; pb = I.C' * chosen_b;
+                wg = I.W' * chosen_g; wb = I.W' * chosen_b;
+                rel(o,:) = 100 * [(cg-cb)/cb, (db-dg)/dg, (pb-pg)/pg, ...
+                    (wb-wg)/wg, (sum(bill(xb))-sum(bill(xg)))/sum(bill(xg)), ...
+                    (sum(downtime(xb))-sum(downtime(xg)))/sum(downtime(xg))];
             end
-            og = og/ORDERS;  dg = dg/ORDERS;  cg = cg/ORDERS;  wg = wg/ORDERS;
-
-            no = nnz(xo);
-            oo = sum(c .* xo, 'all')               / no;
-            g(r)  = 100*(og - oo)/oo;
-            rd(r) = 100*(sum(I.D .* xo,'all')/no             - dg)/dg;
-            rc(r) = 100*(sum(repmat(I.C,1,N) .* xo,'all')/no - cg)/cg;
-            rw(r) = 100*(sum(repmat(I.W,1,N) .* xo,'all')/no - wg)/wg;
+            av = mean(rel,1,'omitnan');
+            g(r)=av(1); rd(r)=av(2); rc(r)=av(3); rw(r)=av(4);
+            rb(r)=av(5); rt(r)=av(6);
         end
-        gap(a,b) = mean(g);   relD(a,b) = mean(rd);
-        relC(a,b) = mean(rc);  relW(a,b) = mean(rw);
+        gap(a,b) = mean(g,'omitnan'); relD(a,b) = mean(rd,'omitnan');
+        relC(a,b) = mean(rc,'omitnan'); relW(a,b) = mean(rw,'omitnan');
+        relBill(a,b) = mean(rb,'omitnan'); relDowntime(a,b) = mean(rt,'omitnan');
   end
   fprintf('  alpha_1 = %6.2f $/km   gap %.1f-%.1f%%   distance vs greedy %+.1f%%\n', ...
           alphaDist(a), min(gap(a,:)), max(gap(a,:)), mean(relD(a,:)));
@@ -209,66 +183,15 @@ fprintf('  the optimum wins the objective in   : %.0f%% of the settings\n', ...
         100*mean(gap(:) > 0));
 fprintf('  it also travels less than greedy in : %.0f%% of the settings\n', ...
         100*mean(relD(:) < 0));
-fprintf('  it always pays less: %d of %d settings\n', sum(relC(:) < 0), numel(relC));
-fprintf('  it always queues less: %d of %d settings\n', sum(relW(:) < 0), numel(relW));
 nGreedyRuns = numel(gap) * REPS * ORDERS;
-fprintf(['  greedy left %d vehicle(s) unserved over %d runs of %d vehicles ' ...
-         '(%.3f%%);\n  all the quantities above are per SERVED vehicle, so this ' ...
-         'does not bias them\n\n'], nUnserved, nGreedyRuns, N, ...
-        100*nUnserved/(nGreedyRuns*N));
-
-%% ------------------------------------------- the numbers to quote in the text
-% The robustness paragraph of the paper cites three figures. Rather than
-% reading them off the plot, they are computed and printed here, so that the
-% text and the figure can never drift apart after a re-run.
-
-gapLo = min(gap, [], 'all');   gapHi = max(gap, [], 'all');
-
-% Where does the distance curve cross zero? Averaged over alpha_3, the curve
-% is monotone in alpha_1, so the crossing is found by linear interpolation in
-% log(alpha_1) between the two settings that straddle it. If it never changes
-% sign inside the sweep, that is reported instead: it is a legitimate outcome
-% and it would mean the domination claim holds everywhere tested.
-dMean = mean(relD, 2)';
-k = find(dMean(1:end-1) .* dMean(2:end) < 0, 1);
-if isempty(k)
-    crossTxt = sprintf('never inside the sweep (distance stays %s zero)', ...
-                       ternary_local(all(dMean > 0), 'above', 'below'));
-    alphaCross = NaN;
-else
-    t = dMean(k) / (dMean(k) - dMean(k+1));           % in [0,1]
-    alphaCross = exp(log(alphaDist(k)) + t*(log(alphaDist(k+1)) - log(alphaDist(k))));
-    crossTxt = sprintf('%.1f $/km', alphaCross);
-end
-
-fprintf('---- numbers for the robustness paragraph -------------------------\n');
-fprintf('  sweep of alpha_1                     : %.2f to %.0f $/km (factor %.0f)\n', ...
-        min(alphaDist), max(alphaDist), max(alphaDist)/min(alphaDist));
-fprintf('  optimality gap of the greedy policy  : %.1f%% to %.1f%%\n', gapLo, gapHi);
-fprintf('  the optimum wins on the objective in : %.0f%% of the settings\n', ...
-        100*mean(gap(:) > 0));
-fprintf('  distance changes sign at alpha_1 =     %s\n', crossTxt);
-% At the CALIBRATED setting, not at the middle of the sweep: median(alphaDist)
-% is the centre of the grid, which has nothing to do with the value the paper
-% adopts, and reporting it here was misleading.
-aCal = objective_weights();   % whatever the suite is currently using
-cMean = mean(relC, 2)';   wMean = mean(relW, 2)';
-la    = log(aCal.dist);
-fprintf('  at the calibrated alpha_1 = %.2f $/km, versus greedy:\n', aCal.dist);
-fprintf('      distance %+.0f%%,  energy bill %+.0f%%,  queueing %+.0f%%\n', ...
-        interp1(log(alphaDist), dMean, la, 'linear'), ...
-        interp1(log(alphaDist), cMean, la, 'linear'), ...
-        interp1(log(alphaDist), wMean, la, 'linear'));
-fprintf('      objective gap of the greedy policy: %.1f%%\n', ...
-        interp1(log(alphaDist), mean(gap,2)', la, 'linear'));
-fprintf('  price  vs greedy, worst case over the sweep : %+.1f%%\n', max(relC(:)));
-fprintf('  time   vs greedy, worst case over the sweep : %+.1f%%\n', max(relW(:)));
-fprintf('-------------------------------------------------------------------\n\n');
-
-fprintf(['Sentence to adapt:\n  "the greedy nearest-port policy is between %.1f%% ' ...
-         'and %.1f%% worse than the\n   optimum at every setting tested, over a ' ...
-         'sweep of alpha_1 spanning a factor %.0f"\n\n'], ...
-        gapLo, gapHi, max(alphaDist)/min(alphaDist));
+fprintf('  skipped requests: %d out of %d order/settings/requests\n', ...
+        nUnserved, nGreedyRuns*N);
+a = find(alphaDist == alphaStarNow.dist, 1);
+b = find(alphaTime == alphaStarNow.time, 1);
+fprintf('  at the reference (%.3f $/km, %.3f $/min), same served cohorts:\n', ...
+        alphaDist(a), alphaTime(b));
+fprintf('    greedy objective excess %.2f%%; distance %+.2f%%; bill %+.2f%%; downtime %+.2f%%\n', ...
+        gap(a,b), relD(a,b), relBill(a,b), relDowntime(a,b));
 
 %% ------------------------------------------------------------- the figure
 % Left: the headline result against the only coefficient that could threaten
@@ -287,16 +210,16 @@ xlabel('\alpha_1   [$/km]');  ylabel('Greedy excess over the optimum [%]');
 title('The advantage of coordination'); ylim([0 max(gap,[],'all')*1.25]);
 
 subplot(1,2,2); hold on; grid on; box on;
-plot(alphaDist, mean(relD, 2), '-o', 'LineWidth', 1.8, ...
+plot(alphaDist, relD(:,b), '-o', 'LineWidth', 1.8, ...
      'DisplayName', 'travel distance');
-plot(alphaDist, mean(relC, 2), '-s', 'LineWidth', 1.8, ...
-     'DisplayName', 'charging price');
-plot(alphaDist, mean(relW, 2), '-^', 'LineWidth', 1.8, ...
-     'DisplayName', 'waiting time');
+plot(alphaDist, relBill(:,b), '-s', 'LineWidth', 1.8, ...
+     'DisplayName', 'energy expenditure');
+plot(alphaDist, relDowntime(:,b), '-^', 'LineWidth', 1.8, ...
+     'DisplayName', 'wait plus charge');
 yline(0, 'k--', 'HandleVisibility', 'off');
 set(gca, 'XScale', 'log', 'FontSize', 11);
 xlabel('\alpha_1   [$/km]');  ylabel('Optimum relative to greedy [%]');
-title('Per-criterion comparison (negative = optimum better)');
+title(sprintf('Common cohort, time value %.3f $/min',alphaTime(b)));
 legend('Location', 'best');
 
 % Uncomment the next line to export this figure as a vector PDF
@@ -313,16 +236,13 @@ end
 
 S = struct('alphaDist', alphaDist, 'alphaTime', alphaTime, ...
            'gap', gap, 'relDist', relD, 'relPrice', relC, 'relWait', relW, ...
+           'relBill',relBill,'relDowntime',relDowntime, ...
            'M', M, 'N', N, 'REPS', REPS);
 end
 
 % =====================================================================
 %  local helpers (compact copies of the ones in realworld_analysis)
 % =====================================================================
-
-function out = ternary_local(cond, a, b)
-    if cond,  out = a;  else,  out = b;  end
-end
 
 function [evLat, evLon] = local_sample(poly, cLat, cLon, N, sigmaKm)
 % Gaussian-biased rejection sampling inside the admissible polygon.

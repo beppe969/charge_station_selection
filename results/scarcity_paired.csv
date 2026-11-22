@@ -1,0 +1,9 @@
+city,case,metric,layouts,contrast,change,lo,hi
+Washington,base,service_pct,30,forecast minus informed,0.02951718322,0.01475859161,0.04849251529
+Washington,base,cost_saving_pct,30,forecast minus informed,-2.641176044,-2.702357401,-2.575081338
+Washington,base,fallback_100_usd,30,forecast minus informed,-2.318971859,-2.371999117,-2.262496314
+Washington,base,common_cost_difference_usd,30,forecast minus informed,-2.321305064,-2.373691892,-2.265636711
+Washington,high load,service_pct,30,forecast minus informed,0.2566666667,0.1966388889,0.3222222222
+Washington,high load,cost_saving_pct,30,forecast minus informed,-1.577734508,-1.615188319,-1.53552842
+Washington,high load,fallback_100_usd,30,forecast minus informed,-1.380772009,-1.418173682,-1.337913722
+Washington,high load,common_cost_difference_usd,30,forecast minus informed,-1.590936619,-1.666004283,-1.51496949

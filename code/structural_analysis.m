@@ -11,9 +11,8 @@ function results = structural_analysis(figdir)
 %   FIGURE 1 - Monotonicity (two panels), optimal objective per EV.
 %       Left  : fix the demand N and add charging ports M. Adding ports can
 %               only enlarge the feasible set, so the objective decreases.
-%       Right : fix M and increase the demand N. The cheap and nearby ports
-%               get taken first, so each additional vehicle is served at a
-%               progressively worse cost.
+%       Right : fix M and increase N. The plotted mean cost per vehicle
+%               can rise or fall as the composition of the fleet changes.
 %       Both panels report the objective PER EV, so the two curves are
 %       directly comparable and cross at the baseline (M = 500, N = 250).
 %
@@ -30,8 +29,9 @@ function results = structural_analysis(figdir)
 % NESTED SAMPLING. For each repetition a SINGLE large scenario is drawn,
 % and the smaller instances are obtained by keeping only the first M rows
 % (or the first N columns) of it. The sub-instances are therefore exactly
-% the large one restricted to fewer ports (or fewer vehicles), so the
-% monotonicity holds instance by instance and not merely on average.
+% the large one restricted to fewer ports (or fewer vehicles). Adding ports
+% weakly lowers optimal total cost at fixed demand. For nonnegative costs
+% adding EVs weakly raises the total; the per-EV trend is empirical.
 %
 % INPUT
 %   figdir  (optional) folder where the figures are saved as PDF.
@@ -40,7 +40,7 @@ function results = structural_analysis(figdir)
 %   results struct with the raw numbers, to redraw the plots without
 %           re-running the simulations.
 %
-% REQUIRES: CVX with Mosek (MILP), and hopcroft_karp.m
+% Requires Optimization Toolbox (intlinprog) and hopcroft_karp.m.
 
 if nargin < 1
     % Default: save every figure. Pass '' to run without saving.
@@ -67,8 +67,7 @@ if ~isempty(figdir)
     fprintf('Figures will be written to: %s\n', fullfile(pwd, figdir));
 end
 
-cvx_solver mosek % Set mosek solver which is faster than default
-cvx_solver_settings('MSK_IPAR_OPTIMIZER', 'MSK_OPTIMIZER_FREE_SIMPLEX')
+mip = optimoptions('intlinprog','Display','off','RelativeGapTolerance',0);
 
 rng(1); % set seed
 
@@ -164,28 +163,9 @@ for t = 1:REPS
         % Objective function term "c"
         [c, tm] = build_objective_matrix(D, W, C, P, Q, alpha);
 
-        cvx_begin quiet
-            % Using Mosek solver, we are able to solve MILP problems
-            variable x(M,N) binary
-
-            % Objective function
-            minimize( sum(sum( x .* c )) )
-
-            subject to
-                % Each EV is assigned to exactly one port
-                sum(x,1)' == 1;
-                % Each port serves at most one EV
-                sum(x,2) <= 1;
-                % Acceptable matrix constraint
-                x <= A;
-        cvx_end
-
-        % CVX returns the variable x as a SPARSE matrix: make it dense
-        % before using it, otherwise the sparsity propagates into every
-        % quantity computed from it (and sparse values break fprintf).
-        x = full(round(x));
-
-        accObj(im) = accObj(im) + cvx_optval;   % cvx_optval is a plain double
+        [x,~,~,~,value] = filtered_assignment_program(A,c,true,[],mip);
+        x = round(x);
+        accObj(im) = accObj(im) + value;
         cntM(im)   = cntM(im) + 1;
 
         % Decomposition: average of each term over the served vehicles.
@@ -271,18 +251,11 @@ for t = 1:REPS
         % Objective function term "c"
         c = build_objective_matrix(D, W, C, P, Q, alpha);
 
-        cvx_begin quiet
-            variable x(M,N) binary
-            minimize( sum(sum( x .* c )) )
-            subject to
-                sum(x,1)' == 1;
-                sum(x,2) <= 1;
-                x <= A;
-        cvx_end
+        [~,~,~,~,value] = filtered_assignment_program(A,c,true,[],mip);
 
         % Normalise by N: the TOTAL objective grows with N simply because
         % more vehicles are summed, which would hide the congestion effect.
-        accN(in) = accN(in) + cvx_optval / N;
+        accN(in) = accN(in) + value / N;
         cntN(in) = cntN(in) + 1;
     end
     fprintf('  repetition %d/%d done\n', t, REPS);
@@ -314,13 +287,10 @@ perEV_N(cntN == 0) = NaN;
 
 fprintf('--- Part 3: extra ports at existing sites (N = %d) ---\n', N_base);
 
-% This sweep has its own sizes, and deliberately starts at the paper's
-% baseline M_base = 500 rather than at M = 250. The reason is structural:
-% at M = N every port must be occupied, so the waiting and price terms are
-% constant and the optimum there is the pure minimum-distance matching. A
-% relative improvement measured from that point would be distorted, because
-% the reference is optimal for one criterion and arbitrary for the others.
-% Starting at M = 500, that is at a load ratio of 0.5, avoids the artefact.
+% At a square full-service assignment every port is occupied. The waiting
+% contribution then has a fixed sum, but time and bill still depend on
+% how heterogeneous energy requests are matched to ports. Start the
+% replication sweep at nominal half load, as in the baseline model.
 M_rep = [500 600 700 800 900 1000];
 M0    = M_rep(1);             % size of the base network
 nExtraMax = max(M_rep) - M0;  % how many extra ports at the largest size
@@ -373,18 +343,9 @@ for t = 1:REPS
         % Objective function term "c"
         [c, tm] = build_objective_matrix(D, W, C, P, Q, alpha);
 
-        cvx_begin quiet
-            variable x(M,N) binary
-            minimize( sum(sum( x .* c )) )
-            subject to
-                sum(x,1)' == 1;
-                sum(x,2) <= 1;
-                x <= A;
-        cvx_end
-
-        x = full(round(x));
-
-        accObjR(im) = accObjR(im) + cvx_optval;
+        [x,~,~,~,value] = filtered_assignment_program(A,c,true,[],mip);
+        x = round(x);
+        accObjR(im) = accObjR(im) + value;
         cntR(im)    = cntR(im) + 1;
         accDR(im)   = accDR(im) + sum(sum(D .* x)) / N;
         accTravR(im)  = accTravR(im)  + sum(sum(tm.travel  .* x)) / N;

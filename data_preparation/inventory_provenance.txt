@@ -1,0 +1,39 @@
+Historical station inventory and Tivoli Square lookup
+
+The authors archived the national charging-station extract and three city files
+in the original replication package on October 12, 2026. The local copies have
+the same Git blob hashes as those in public commit
+67548da7db9c9b7bf084ab4ab7b2b58ebda005d5.
+https://github.com/beppe969/charge_station_selection/tree/67548da7db9c9b7bf084ab4ab7b2b58ebda005d5/data
+
+USA_EV_CS.csv                    9a0474081bf72c35e545869134d814a108485a2b
+CS_location_DC_complete.csv      efded3b73957c888dd146178854fcfd1423762f8
+CS_location_Chicago.xlsx         3f283ff25a443d2156cacc80e097ecab0d23e922
+CS_location_Manhattan.xlsx       76bac896fcb653ffc74410c7c54d2bd1c299d00a
+
+The original package attributes the national file to the U.S. Department of
+Energy. Its 65,134 data rows contain no retrieval timestamp. The original
+agency extraction date is unknown. SHA-256 file checksums for the frozen city,
+national and road inputs are in ../data/inventory.sha256.
+
+The District Department of Transportation's September 29, 2023 update to the
+District of Columbia Plan for Electric Vehicle Infrastructure Deployment lists
+station 167946 at 1345 Park Rd NW with two Level 2 ports and J1772 connectors
+on the Volta network (printed page 51, PDF page 54). This agrees with the row
+named Tivoli Square in USA_EV_CS.csv.
+https://www.arcgis.com/sharing/rest/content/items/bf5c02fb79db4e52a385116ebe0a576e/data
+
+The accompanying tivoli_registry_2026-11-22.json records a public lookup
+using the historical station identifier and the coordinates in the Washington
+file. The federal registry returned HTTP 404 for the identifier and found
+zero electric stations within 0.1 mile across all access and status classes.
+As a check on the coordinates and query, the same search within one mile
+found six stations. The JSON includes the full responses for the direct ID and
+0.1-mile lookups, the database update timestamp and selected fields from the
+wider search. DEMO_KEY is the provider's public demonstration credential.
+
+These queries document what the registry listed on November 22, 2026. Whether
+the equipment was still on site, working, and connected to the same service
+requires verification with the owner. The three-city simulations use the frozen
+inputs above. Running the registry requests again may return different results.
+https://developer.nlr.gov/docs/transportation/alt-fuel-stations-v1/

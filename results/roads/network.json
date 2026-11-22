@@ -1,0 +1,43 @@
+{
+  "layouts": 30,
+  "Street": {
+    "source_blocks": 13833,
+    "direction_counts": {
+      "BD": 11281,
+      "IB": 1098,
+      "OB": 1222,
+      "??": 231,
+      "missing": 1
+    },
+    "largest_strong_component": 8505,
+    "snap_nodes": 8638,
+    "rounded_endpoint_decimals": 5,
+    "graph_nodes": 8638,
+    "directed_arcs": 24772,
+    "site_offset_median_km": 0.0506336063876608,
+    "site_offset_max_km": 0.2088669528144548,
+    "origin_offset_median_km": 0.060859724719064104,
+    "origin_offset_p95_km": 0.2090265823470738,
+    "origin_offset_max_km": 0.9767142656720949
+  },
+  "Connected core": {
+    "source_blocks": 13833,
+    "direction_counts": {
+      "BD": 11281,
+      "IB": 1098,
+      "OB": 1222,
+      "??": 231,
+      "missing": 1
+    },
+    "largest_strong_component": 8505,
+    "snap_nodes": 8505,
+    "rounded_endpoint_decimals": 5,
+    "graph_nodes": 8638,
+    "directed_arcs": 24772,
+    "site_offset_median_km": 0.0506336063876608,
+    "site_offset_max_km": 0.2088669528144548,
+    "origin_offset_median_km": 0.06138601297888653,
+    "origin_offset_p95_km": 0.23783944077509986,
+    "origin_offset_max_km": 1.1988521990259642
+  }
+}

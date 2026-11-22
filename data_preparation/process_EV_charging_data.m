@@ -7,7 +7,10 @@ function filtered_data = process_EV_charging_data(filename, selected_state)
 %       filtered_data - filtered table with selected columns and cleaned EVSE values
 
     % Read the CSV file and import data
-    data = readtable(filename);
+    % The national snapshot uses semicolon delimiters and space-separated headers.
+    opts = detectImportOptions(filename, 'Delimiter',';', 'Encoding','windows-1252');
+    opts = setvartype(opts,'ZIP','char');  % preserve leading zeros
+    data = readtable(filename,opts);
 
     % --- PIE CHART OF STATES ---
     %{

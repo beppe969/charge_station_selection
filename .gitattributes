@@ -1,0 +1,25 @@
+# Keep checkout hashes stable on platforms that normally convert newlines.
+*.py text eol=lf
+*.m text eol=lf whitespace=trailing-space,space-before-tab,cr-at-eol
+*.tex text eol=lf
+*.txt text eol=lf
+*.csv text eol=lf whitespace=trailing-space,space-before-tab,cr-at-eol
+*.json text eol=lf
+*.sha256 text eol=lf
+*.md text eol=lf
+*.cff text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+
+# Archived inputs, historical MATLAB files and CSV writer output retain original bytes.
+data/*.csv -text
+code/hopcroft_karp.m -text
+code/munkres.m -text
+code/pareto_knee_from_table.m -text
+data_preparation/process_EV_charging_data.m -text
+results/planning/*.csv -text
+
+*.pdf binary
+*.xlsx binary
+*.mat binary
+*.gz binary

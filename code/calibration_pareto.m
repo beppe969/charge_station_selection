@@ -46,8 +46,8 @@ Qmin = 20;     Qmax = 60;      % [kWh]
 a1_vals = logspace(log10(0.25), log10(4.0), 13);   % alpha_1 [$/km]
 a3_vals = logspace(log10(0.05), log10(1.0), 13);   % alpha_3 [$/min]
 
-if exist('hungarian_assignment_sparse', 'file') == 2
-    solve_fun = @hungarian_assignment_sparse;
+if exist('matchpairs', 'file') == 2
+    solve_fun = @matchpairs_assignment;
 else
     solve_fun = @hungarian_assignment_binary;
 end
@@ -135,7 +135,7 @@ plot(Knee.meanSpend, Knee.meanDist, 'p', 'MarkerSize', 20, ...
      'MarkerFaceColor', [0.95 0.85 0.15], 'MarkerEdgeColor', 'k', ...
      'LineWidth', 1.2, 'DisplayName', 'Knee point');
 cb = colorbar;  cb.Label.String = 'Average time out of service [min]';
-colormap(turbo);
+colormap(parula);
 xlabel('Average expenditure per EV [$]');
 ylabel('Average travel distance per EV [km]');
 title('The trade-off frontier in the spend--distance plane');
@@ -197,7 +197,7 @@ fprintf('%% ========================================================\n\n');
 % would silently keep running on the literature values, and the claim that
 % the calibrated setting is the one adopted everywhere else would be false.
 alphaStar = struct('dist', Knee.alpha1, 'price', 1, 'time', Knee.alpha3, ...
-                   'source', 'calibration_pareto knee point', ...
+                   'source', 'synthetic compromise with 1.4/7.2/50 kW class proxies', ...
                    'date', datestr(now, 'yyyy-mm-dd HH:MM'), ...
                    'M', M, 'N', N, 'REPS', REPS);
 save('calibrated_alpha.mat', 'alphaStar');
@@ -228,16 +228,8 @@ function [dBar, sBar, tBar] = evaluate(alpha, inst, solve_fun)
         N = numel(I.Q);
 
         c = build_objective_matrix(I.D, I.W, I.C, I.P, I.Q, alpha);
-        H = c;  H(~I.A) = 1e6;                  % forbid the non-acceptable pairs
-        % NOTE the argument order: the solver takes the acceptable matrix
-        % FIRST and the cost matrix second, as everywhere else in this suite.
-        x = full(double(solve_fun(I.A, H)));
-
-        % The forbidden pairs carry a large FINITE penalty, so an infeasible
-        % instance does not make the solver fail: it returns a complete
-        % assignment that uses forbidden pairs at cost 1e6. Cardinality is
-        % therefore not a feasibility test, and the second condition is the
-        % one that actually detects the problem.
+        x = full(double(solve_fun(I.A,c)));
+        % Each calibration instance was checked for a saturating matching.
         if nnz(x) < N || any(~I.A(logical(x)))
             error(['The solver returned an assignment using forbidden pairs, ' ...
                    'or served\nfewer than %d vehicles, although the instance ' ...

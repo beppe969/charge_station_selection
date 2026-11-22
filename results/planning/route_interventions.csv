@@ -1,0 +1,4 @@
+geometry,layouts,target_site,control_site,mean_baseline_served,mean_baseline_deficit,baseline_full,target_improved,control_improved,both_improved,target_extra_mean,control_extra_mean,target_minus_control_mean,lower95,upper95,target_wins,win_probability_lower95,win_probability_upper95,discount_improved,discount_extra_mean
+Planar,96,234,19,520.677083333,6.32291666667,2,73,0,0,0.760416666667,0,0.760416666667,0.666666666667,0.84375,73,0.662506530085,0.841661623872,11,0.135416666667
+Street,96,234,19,450.739583333,76.2604166667,0,96,0,0,1,0,1,1,1,96,0.962303078376,1,0,0
+Connected core,96,234,19,461.270833333,65.7291666667,0,96,0,0,1,0,1,1,1,96,0.962303078376,1,0,0

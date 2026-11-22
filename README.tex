@@ -1,229 +1,96 @@
 \documentclass[11pt,a4paper]{article}
-\usepackage[margin=2.5cm]{geometry}
 \usepackage[T1]{fontenc}
-\usepackage{lmodern}
-\usepackage{booktabs}
-\usepackage{xcolor}
-\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue]{hyperref}
-\usepackage{enumitem}
-\usepackage{listings}
-
-\lstset{
-  basicstyle=\ttfamily\small,
-  frame=single,
-  framesep=4pt,
-  xleftmargin=4pt,
-  columns=flexible,
-  breaklines=true,
-  showstringspaces=false
-}
-
-\title{Replication package\\
-\large A Matching-Theoretic Approach to Optimal Charging Station Selection
-for Electric Vehicles}
-\author{Luca Ambrosino, Hong T. M. Chu, Laurent El Ghaoui,
-Giuseppe C. Calafiore}
-\date{\today}
-
+\usepackage{lmodern,booktabs,enumitem,listings,microtype}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage[hidelinks]{hyperref}
+\lstset{basicstyle=\ttfamily\small,columns=fullflexible,breaklines=true,showstringspaces=false}
+\setlist{nosep,leftmargin=*}
+\title{Replication guide\\[4pt]\large EV charging-port assignment under range and tariff constraints}
+\author{Luca Ambrosino, Hong T. M. Chu, Laurent El Ghaoui and Giuseppe C. Calafiore}
+\date{Revised analysis, November 2026}
 \begin{document}
 \maketitle
+\section*{Reproduce the revised manuscript}
+Start in the directory containing this guide. The city policy comparisons, Washington planning experiments and manuscript inputs use Python. The accompanying requirements file records the tested versions. With a Python 3.9 environment, run
+\begin{lstlisting}
+python -m pip install -r requirements.txt
+python run_revised.py
+\end{lstlisting}
+The runner verifies the station-file checksums and uses the archived MATLAB timings by default. Pass \texttt{--matlab} followed by the executable path to regenerate timings on the local machine. Keep \texttt{data/}, \texttt{code/} and \texttt{results/} in this directory.
 
-\section{What this is}
+\subsection*{City comparisons}
+\texttt{code/revised\_primary\_cities.py} constructs the primary, half-load comparison on the source-reconciled public inventory for each city. It rebuilds the footprint and sets the request count to half the retained port count, rounded up. Thirty seeded layouts per city share the same requests and operating conditions across policies. Every initial request enters the service denominator. Comparisons on a fixed served group hold vehicle identities constant. Generalized monetary cost includes travel, the energy bill and valued time. The nominal class proxies are 1.4, 7.2 and 50~kW for Level~1, Level~2 and DC fast, subject to vehicle power acceptance.
 
-Everything needed to reproduce the figures and tables of the paper: the
-MATLAB code, the charging-network data, and the scripts that built those
-data from the public source. Each experiment is one function, and each
-function states in its header which section of the paper it produces.
-
-The code is written to be run and read, not only run. Where a choice is not
-obvious, or where we got it wrong once, the reason is in a comment next to
-it.
-
-\section{Requirements}
-
-MATLAB R2021b or later. The experiments were run on R2023b under Windows,
-on a machine with 14 physical cores; the timings reported in Section~3.4.2
-of the paper refer to that machine.
-
-Three toolboxes are used:
-
-\begin{itemize}[nosep]
-  \item \textbf{Statistics and Machine Learning Toolbox}, for
-        \texttt{datasample} and \texttt{quantile};
-  \item \textbf{Mapping Toolbox}, for the basemaps under the city maps.
-        Without it the maps still draw, on plain axes;
-  \item \textbf{Optimization Toolbox} or \textbf{Mosek}, for the MILP and
-        its relaxation in \texttt{time\_scaling}. Mosek is preferred and is
-        what the paper used; \texttt{intlinprog} is used automatically if
-        \texttt{mosekopt} is not on the path.
+\begin{lstlisting}
+python code/access_audit.py
+python code/revised_primary_cities.py
+python code/revised_city_study.py
+python code/revised_public_access.py
+python code/revised_scarcity.py
+\end{lstlisting}
+\begin{itemize}
+\item Files in \texttt{results/} with the prefix \texttt{primary\_city\_} contain inventory counts (\texttt{inventory.csv}), observations (\texttt{layouts.csv}), summaries (\texttt{summary.csv}) and contrasts (\texttt{factorial.csv}).
+\item \texttt{revised\_city\_study.py} generates the original all-listed half-load comparison and the Washington load and assumption sensitivities. Outputs include \texttt{city\_layouts.csv}, \texttt{city\_summary.csv} and \texttt{city\_factorial.csv}. The factorial contrasts include hypothetical fallback costs of \$50, \$100 and \$200 per unserved request.
+\item \texttt{revised\_public\_access.py} keeps the original all-listed demand and site attributes fixed while restricting available ports. Chicago includes a third arm capping public counts at source multiplicity. Outputs are \texttt{access\_layouts.csv} and \texttt{access\_summary.csv}.
+\item \texttt{revised\_scarcity.py} prices the opportunity cost of consuming Washington ports using a separate forecast sample. It compares the resulting online policy with sequential and batch cost policies at half and high load. The observations, summaries and paired contrasts have the prefix \texttt{scarcity\_}.
 \end{itemize}
 
-Nothing else is needed. The Hungarian algorithm, the Hopcroft--Karp
-matching and the greedy policies are all included here and are
-self-contained.
+\newpage
+\section*{Washington feasibility and investment scenarios}
+\texttt{code/planning\_study.py} diagnoses failed layouts with maximum matching and alternating paths. It freezes inputs within each range and budget sweep, selects an expansion site on 32 discovery layouts and estimates its effect on 96 independent evaluation layouts. Sixty-four further layouts supply the sweeps and thresholds.
+\texttt{results/planning/} contains the feasibility frontier, thresholds, deficient group and intervention outcomes. Run \texttt{code/planning\_routes.py} next to retest the selected sites on the same 96 layouts with street distances. Its two CSV outputs have the prefix \texttt{route\_intervention}.
 
-\section{Layout}
+\subsection*{Street-network sensitivity}
+\texttt{code/road\_study.py} compares planar and directed street distances on the same 30 Washington half-load layouts, site attributes and arrival orders. The offline input \texttt{data/dc\_road\_blocks.csv.gz} contains 13,833 blocks from the District Department of Transportation's \href{https://catalog.data.gov/dataset/roadway-block}{Roadway Block layer}, retrieved November 22, 2026. The graph uses the reported lengths in metres and permits travel forward for OB, in reverse for IB and in both directions for BD. It omits 232 blocks with unknown direction.
 
-\begin{center}
-\begin{tabular}{ll}
-\toprule
-\texttt{code/} & the nine experiments and everything they call \\
-\texttt{data/} & the three city networks, plus the national source file \\
-\texttt{data\_preparation/} & how the city files were built from the source \\
-\texttt{figures/} & the figures, exactly as the code produces them \\
-\bottomrule
-\end{tabular}
-\end{center}
+Endpoints rounded to five decimal degrees define graph nodes. EVs and sites connect to their nearest node by straight access legs. A pair with no directed path is ineligible. A third arm limits snapping to the 8,505 endpoints in the largest strongly connected component of the 8,638-node graph, testing how attachment to disconnected streets affects service. Routing represents street geometry and direction, without turn restrictions or time-varying traffic.
+The road results appear in \texttt{results/roads/}. Three CSV files give layout observations, summaries and paired contrasts. The file \texttt{network.json} records the graph metadata. To retrieve a fresh ArcGIS extract, run \texttt{prepare\_dc\_roads.py} in \texttt{data\_preparation/}.
 
-\section{Running everything}
-
-From the \texttt{code/} folder:
-
+\section*{Verify model and solver implementations}
+The reference run used MATLAB R2020a with Optimization Toolbox 8.5.
 \begin{lstlisting}
->> run_all_simulations
+addpath('code');
+verify_assignment;
 \end{lstlisting}
+\texttt{code/verify\_assignment.m} checks the original integer program with one aggregate budget row per EV against a filtered LP and minimum-cost matching. A one-EV example returns 11 for the original integer program and filtered LP, and 7 for the original budget-row LP. Twelve feasible seeded rectangular or square instances check equivalence. Additional cases exercise tied optima, partial service, missing edges and costs above one million.
 
-This runs the nine experiments in the order in which they appear in the
-paper and takes a couple of hours, most of it in \texttt{time\_scaling},
-which solves a mixed-integer program at eight sizes, and in the three real
-networks, which solve $100$ assignment problems each.
+The benchmark uses two fleet sizes, three edge probabilities and five realizations per setting. A planted matching ensures full service. All four implementations receive identical eligible edges and costs in each realization and run in shuffled order. The sparse-input and dense-input paths pass the same normalized edge costs and cardinality reward to MATLAB's \texttt{matchpairs}. The LP and MILP instantiate one variable per acceptable pair. The reduced LP has integral vertices. The test uses dual simplex.
+\begin{itemize}
+\item \texttt{results/solver/benchmark\_trials.csv} records edge counts, setup, solve and end-to-end times, primary input matrix sizes, objectives and integrality residuals. Shared inputs and solver workspace are excluded from matrix storage.
+\item \texttt{benchmark\_summary.csv} gives group medians and timing ranges. \texttt{environment.txt} identifies the MATLAB environment and seed.
+\end{itemize}
 
-Order matters in one place only. \texttt{calibration\_pareto} writes
-\texttt{calibrated\_alpha.mat}, and every later script reads the two
-coefficients from it. A copy of that file is shipped with the package, so
-the calibration step can be skipped and the numbers in the paper still come
-out. Each script announces, once per session, which coefficients it is
-using and where they came from; if it says \emph{literature} instead of
-\emph{calibrated}, the \texttt{.mat} file is not on the path.
+\newpage
+\section*{Station inventories and geocoding}
+The package includes the national address and connector-count extract \texttt{data/USA\_EV\_CS.csv}, attributed in the original package to the U.S. Department of Energy. The agency maintains the \href{https://afdc.energy.gov/stations}{Alternative Fueling Station Locator}. The historical extraction date and original geocoding decisions are unavailable. The three shipped city files supply geocoded records. Four Chicago records lack usable coordinates. The Washington file includes 333 Washington labels and one Alexandria label. The Manhattan file uses the city label New York.
 
-\section{Running one experiment}
-
-\begin{center}
-\begin{tabular}{lll}
+\texttt{code/access\_audit.py} joins each usable city-file record to the national extract by normalized street, city, state, five-digit ZIP and the three port-class counts. All matched groups have a single access classification. The primary analyses keep public groups and cap each group's row count at its multiplicity in the national extract. Records at identical coordinates then contribute their retained ports to the same site. The row-by-row crosswalk \texttt{results/inventory\_access.csv} records candidate national row numbers, access classification and whether the geocoded row is within that source count.
+\begin{center}\small
+\begin{tabular}{llrrrr}
 \toprule
-\textbf{Paper} & \textbf{Command} & \textbf{Produces} \\
+Area & Inventory & Geocoded rows & Sites & Ports & Level 1 / Level 2 / DC \\
 \midrule
-Sec.~3.2   & \texttt{calibration\_pareto}      & Table 1, Fig.~3 \\
-Sec.~3.3.1, 3.3.3 & \texttt{structural\_analysis} & Fig.~4, Fig.~5 \\
-Sec.~3.3.2 & \texttt{synthetic\_comparison}    & Table 2 \\
-Sec.~3.4.1 & \texttt{toy\_equivalence}         & Fig.~6 \\
-Sec.~3.4.2 & \texttt{time\_scaling}            & Fig.~7 \\
-Sec.~4.1   & \texttt{realworld\_analysis(...)} & Tables 3--4, Figs.~8--11 \\
-Sec.~4.2   & \texttt{feasibility\_sweep(...)}  & Table 5, Fig.~12 \\
-Sec.~4.3   & \texttt{load\_sweep(...)}         & Table 6, Fig.~13 \\
-Sec.~4.4   & \texttt{sensitivity\_alpha(...)}  & Fig.~14 \\
+Washington & All listed and public & 334 & 251 & 1,053 & 2 / 988 / 63 \\
+Chicago & All listed & 277 & 171 & 725 & 2 / 608 / 115 \\
+        & Public, before capping & 271 & 168 & 712 & 0 / 597 / 115 \\
+        & Source-reconciled public & 230 & 168 & 598 & 0 / 496 / 102 \\
+Manhattan & All listed & 352 & 321 & 1,061 & 0 / 1,025 / 36 \\
+          & Source-reconciled public & 340 & 310 & 998 & 0 / 978 / 20 \\
 \bottomrule
 \end{tabular}
 \end{center}
+In Chicago, 35 keys occur more often in the geocoded file than in the national source. Each has a single coordinate and equipment profile. Capping removes 42 excess records (115 ports) across all access classes, including 41 public records (114 ports). No other city exceeds source multiplicity.
 
-The four scripts that take an argument want the path to a city file:
-
+\subsection*{Prepare a fresh selection}
+\texttt{data\_preparation/Coordinates\_Finder.m} selects public records with positive port counts via \texttt{process\_EV\_charging\_data} and queries OpenCage with the operator's \texttt{OPENCAGE\_API\_KEY} environment variable. Give the state, source city label(s) and a new output filename. New York is the default city for NY. An empty city string selects all eligible records for the state.
 \begin{lstlisting}
->> realworld_analysis('../data/CS_location_DC_complete.csv')
->> realworld_analysis('../data/CS_location_Chicago.xlsx')
->> realworld_analysis('../data/CS_location_Manhattan.xlsx')
->> feasibility_sweep('../data/CS_location_DC_complete.csv')
->> load_sweep('../data/CS_location_DC_complete.csv')
->> sensitivity_alpha('../data/CS_location_DC_complete.csv')
+addpath('data_preparation')
+Coordinates_Finder('NY', "New York", 'manhattan-new-geocodes.csv');
 \end{lstlisting}
+\texttt{merge\_census\_results} imports a separate U.S. Census batch geocoder response by row ID. Use a working spreadsheet copy for that merge and \texttt{clean\_city\_file}, which update their input spreadsheet. New geocodes produce a different dataset.
 
-The city name is inferred from the file name and used to tag the figures,
-so the three cities do not overwrite each other. Pass it explicitly as a
-third argument if the file is named differently.
+\subsection*{Historical MATLAB explorations}
+From \texttt{code/}, \texttt{run\_all\_simulations(false)} runs the updated historical explorations. With \texttt{true} it first reruns the synthetic preference sweep. The shipped synthetic knee gives 3.175 dollars/km and 0.287 dollars/min. Revised city valuations are specified directly in Python. Historical scripts use Optimization Toolbox and Statistics and Machine Learning Toolbox. The legacy timing script can additionally measure CVX/MOSEK. Earlier plots in \texttt{figures/} document pre-revision results. The original package identifies its code license as MIT. Contact \href{mailto:luca.ambrosino@polito.it}{Luca Ambrosino} about inventory provenance.
 
-The code draws more than the paper shows. Every city produces its own maps and
-its own boxplot of each criterion, and \texttt{synthetic\_comparison} draws the
-boxplots behind Table 2, whereas the paper displays one city per figure to keep
-the page count down; \texttt{figures/} therefore holds rather more files than
-there are figures in the paper. The two bipartite-graph diagrams of
-Section~2.3, Figures 1 and 2, are the only ones the code does not generate:
-they were drawn by hand.
-
-Every script prints its results table to the console in a form that can be
-pasted straight into \LaTeX{}. The tables in the paper are those blocks,
-merged across cities by hand.
-
-\section{The data}
-
-\texttt{data/} holds the three networks used in Section~4:
-
-\begin{center}
-\begin{tabular}{llrr}
-\toprule
-\textbf{City} & \textbf{File} & \textbf{Stations} & \textbf{Ports} \\
-\midrule
-Washington DC   & \texttt{CS\_location\_DC\_complete.csv}  & 334 & 1053 \\
-Chicago         & \texttt{CS\_location\_Chicago.xlsx}      & 277 &  725 \\
-Manhattan (NY)  & \texttt{CS\_location\_Manhattan.xlsx}    & 352 & 1061 \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Each row is one station, with its coordinates and the number of connectors
-of each type. The code expands every station into its individual ports,
-since the model is formulated at port level.
-
-\texttt{USA\_EV\_CS.csv} is the national source these were extracted from.
-It is included so that the three city files can be rebuilt, or new cities
-added, without hunting for the original download.
-
-\section{Rebuilding the city files}
-
-The source file gives addresses, not coordinates. \texttt{data\_preparation/}
-contains the pipeline that produced the three city files, in the order in
-which it is run:
-
-\begin{enumerate}[nosep]
-  \item \texttt{process\_EV\_charging\_data} selects the rows of one
-        metropolitan area from the national file;
-  \item \texttt{Coordinates\_Finder} sends the addresses to the U.S.\ Census
-        Bureau batch geocoder, in blocks, and collects the answers;
-  \item \texttt{merge\_census\_results} joins the geocoded coordinates back
-        onto the station records;
-  \item \texttt{clean\_city\_file} drops the rows the geocoder could not
-        resolve and writes the final file.
-\end{enumerate}
-
-Step 2 needs an internet connection and is the slow one. There is no need to
-run any of this to reproduce the paper: the three output files are already
-in \texttt{data/}.
-
-\section{What is random and what is not}
-
-The physical network is fixed: station coordinates and connector powers come
-from the data and never change. Everything describing the demand and the
-operating conditions is redrawn at every instance, namely vehicle positions,
-energy demands, budgets, tariffs and waiting times.
-
-Every script seeds the generator at the top, so a given script reproduces
-its own numbers exactly. Across versions of MATLAB the stream may differ in
-the last digits; the figures in the paper are averages over $100$ instances
-and are stable well beyond that.
-
-One consequence worth knowing: adding a method to a comparison consumes
-random numbers and shifts the stream, so the other methods move slightly
-too. If a number changes in the second decimal after you edit a script, this
-is usually why.
-
-\section{A note on the big-M}
-
-Forbidden pairs are given to the Hungarian algorithm as a large but
-\emph{finite} penalty. On an infeasible instance the algorithm therefore
-does not fail: it returns a complete assignment that quietly uses forbidden
-pairs. Counting the assigned vehicles detects nothing, since the count is
-$N$ either way.
-
-Every script that solves an assignment problem checks feasibility with
-\texttt{hopcroft\_karp} before solving, and verifies afterwards that the
-returned assignment lies inside the acceptable matrix. If you reuse this
-code, keep both checks.
-
-\section{License and contact}
-
-The code is released under the MIT license. The charging-station data are
-derived from a public U.S.\ Department of Energy dataset and are
-redistributed here for reproducibility only.
-
-Questions and bug reports: \href{mailto:luca.ambrosino@polito.it}{luca.ambrosino@polito.it}.
-
+The historical entry point \texttt{hungarian\_assignment\_sparse} selects dense-input MATLAB matching for compatibility. Use \texttt{matchpairs\_assignment(A,C,'sparse')} for the sparse input. The index of an unmatched vehicle's port is zero. A Boolean output reports whether every vehicle was served.
 \end{document}

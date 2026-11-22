@@ -1,4 +1,6 @@
 function results = realworld_analysis(csvFile, figdir, cityTag)
+% Legacy MATLAB exploration. The revised manuscript and its paired uncertainty
+% estimates are reproduced by revised_city_study.py.
 % REALWORLD_ANALYSIS  The case study on one real network (Sec. 4.1).
 %
 %   results = realworld_analysis(csvFile)
@@ -16,11 +18,8 @@ function results = realworld_analysis(csvFile, figdir, cityTag)
 %   realworld_analysis('../data/CS_location_Chicago.xlsx')
 %   realworld_analysis('../data/CS_location_Manhattan.xlsx')
 %
-% Note on feasibility. draw_instance may grant a stranded vehicle its
-% nearest affordable port. That only gives THAT vehicle an option; several
-% repaired vehicles can still depend on the same port, so the instance is
-% not feasible by construction and is tested with hopcroft_karp before
-% anything is solved. At Rmax = 5 km the repair never fires anyway.
+% Maximum-cardinality matching checks how many requests can be served on
+% each physical eligibility graph. The solver then minimizes cost at that count.
 %
 % Prints a paste-ready LaTeX table and writes seven figures per city.
 
@@ -78,10 +77,7 @@ rng(1); % set seed
 %  ==================================================================
 
 load_ratio = 0.5;    % N / M, the baseline occupancy of Section 3.3
-% Driving-range radius, which defines reachability R_ij. The value matters:
-% with 3 km a handful of vehicles sampled at the edge of the network find no
-% port at all and the instance becomes infeasible; at 5 km every vehicle has
-% several dozen acceptable ports and the instances are comfortably feasible.
+% Radius used to construct the hard physical eligibility graph.
 Rmax_km    = 5.0;    % [km]
 % Energy demand of each EV [kWh]. Drawn per vehicle in the interval below:
 % a car arrives with a partly depleted battery of about 60 kWh and charges
@@ -102,7 +98,6 @@ REPS       = 100;    % random EV layouts in Stage 2
 ORDERS     = 5;      % random processing orders per greedy run
 sigmaKm    = 2.5;    % Gaussian spread of the EV density around the centroid
 
-BIGM = 1e6;          % penalty used to forbid the non-acceptable pairs
 
 
 % Objective coefficients. Every term of the objective is expressed in
@@ -119,19 +114,13 @@ Cmin = 0.303;  % [$/kWh]
 Cmax = 0.530;  % [$/kWh]
 
 % Nominal power associated with each connector type [kW]
-pow_level1 = 7;    % Level 1 (slow); only a couple of them in the DC subset
-pow_level2 = 19;   % Level 2 (the bulk of the network)
+pow_level1 = 1.4;    % Level 1 (slow); only a couple of them in the DC subset
+pow_level2 = 7.2;   % Level 2 (the bulk of the network)
 pow_dcfast = 50;   % DC fast
 
-% The sparse Hungarian is the solver of choice; fall back to the dense one
-if exist('hungarian_assignment_sparse', 'file') == 2
-    solver_name = 'sparse Hungarian';
-    solve_fun   = @hungarian_assignment_sparse;
-else
-    warning('hungarian_assignment_sparse not found: using the dense version.');
-    solver_name = 'dense Hungarian';
-    solve_fun   = @hungarian_assignment_binary;
-end
+% Compiled MATLAB assignment with dense cost input.
+solve_fun = @matchpairs_assignment;
+solver_name = 'MATLAB matchpairs (dense input)';
 
 %% ==================================================================
 %  PART 0: load the network and expand the stations into ports
@@ -235,22 +224,22 @@ c = build_objective_matrix(D, W, C, P, Q, alpha);
 [~, num_matches] = hopcroft_karp(A);
 fprintf('  acceptable pairs   : %.1f%% of M*N\n', 100*nnz(A)/(M*N));
 fprintf('  acceptable per EV  : min %d, mean %.0f\n', min(sum(A,1)), mean(sum(A,1)));
-fprintf('  repaired EVs       : %d (had no acceptable port)\n', nRep);
+fprintf('  isolated EVs       : %d (had no acceptable port)\n', nRep);
 fprintf('  max matching       : %d of %d EVs %s\n', num_matches, N, ...
         ternary(num_matches == N, '(feasible)', '(INFEASIBLE)'));
 
-% ---- optimal assignment via the sparse Hungarian algorithm
+% ---- maximum-cardinality minimum-cost assignment
 H = c;
-H(~A) = BIGM;   % set a very big number for unadmissible selections
 t0 = tic;
 x_opt = solve_fun(A, H);
 t_opt = toc(t0);
 x_opt = full(double(x_opt));    % the solver may return a sparse matrix
 
 % ---- greedy baselines, one random order each
-t0 = tic;  x_near = greedy_nearest(D, A);              t_near = toc(t0);
-t0 = tic;  x_kche = greedy_cheapest_k(D, C, A, kNear); t_kche = toc(t0);
-t0 = tic;  x_gcos = greedy_cost(c, A);                 t_gcos = toc(t0);
+order = randperm(N);
+t0 = tic;  x_near = greedy_nearest(D, A, order);              t_near = toc(t0);
+t0 = tic;  x_kche = greedy_cheapest_k(D, C, A, kNear, order); t_kche = toc(t0);
+t0 = tic;  x_gcos = greedy_cost(c, A, order);                 t_gcos = toc(t0);
 
 % ---- coordinated, but single-objective: minimum total distance.
 % This baseline exists to separate two things the other comparisons leave
@@ -261,7 +250,6 @@ t0 = tic;  x_gcos = greedy_cost(c, A);                 t_gcos = toc(t0);
 % Against the greedy nearest-port rule it isolates coordination on a fixed
 % criterion; against the proposed model it isolates the criterion itself.
 Hd = D;
-Hd(~A) = BIGM;
 t0 = tic;  x_mind = full(double(solve_fun(A, Hd)));  t_mind = toc(t0);
 
 m_opt  = assignment_stats(x_opt,  c, D, W, C, N, Q, portStation, nStations);
@@ -306,7 +294,8 @@ d90Acc  = nan(REPS, nMethods);   % 90th percentile of the per-vehicle distance
 dmaxAcc = nan(REPS, nMethods);   % worst trip of the fleet
 spendAcc= nan(REPS, nMethods);   % money paid for the energy, C_i * Q_j [$]
 unusedAcc = nan(REPS, nMethods); % stations that serve nobody
-repAcc  = nan(REPS, 1);          % EVs repaired in each layout
+repAcc  = nan(REPS, 1);          % EVs with no eligible port
+maxCard = zeros(REPS, 1);
 
 % Per-EV outcomes pooled across layouts, for the trade-off figure
 % Per-station utilisation, accumulated across layouts (vehicles served)
@@ -326,42 +315,15 @@ for rep = 1:REPS
     % Objective function term "c"
     c = build_objective_matrix(D, W, C, P, Q, alpha);
 
-    % ---- FEASIBILITY OF THE WHOLE FLEET, CHECKED EXPLICITLY.
-    %      draw_instance may have granted a stranded vehicle reachability of
-    %      its nearest affordable port. That guarantees the vehicle has at
-    %      least one option, which is Hall's condition on the singletons; it
-    %      does NOT guarantee that all N vehicles can be served at the same
-    %      time at distinct ports, since several repaired vehicles may end up
-    %      depending on the same one. The instance is therefore not feasible
-    %      by construction and has to be tested, which a maximum-cardinality
-    %      matching does in O(|E| sqrt(M+N)).
     [~, nMatch] = hopcroft_karp(A);
-    if nMatch < N
-        fprintf('  layout %3d: no EV-saturating matching exists, skipped\n', rep);
-        objAcc(rep,:) = NaN;
-        continue;
-    end
-
-    % ---- (1) optimal.
-    %      A WORD ON THE TEST BELOW. The forbidden pairs are given to the
-    %      Hungarian algorithm as a large FINITE penalty, not as infinity,
-    %      so on an infeasible instance the algorithm does not fail: it
-    %      returns a complete assignment that silently uses forbidden pairs
-    %      at cost BIGM. Counting the assigned vehicles therefore detects
-    %      nothing, since nnz(xo) equals N either way. What has to be
-    %      checked is that no pair outside the acceptable matrix was used.
+    maxCard(rep) = nMatch;
     H = c;
-    H(~A) = BIGM;
     t0 = tic;
     xo = solve_fun(A, H);
     timeAcc(rep,1) = toc(t0);
     xo = full(double(xo));
 
-    if nnz(xo) < N || any(~A(logical(xo)))
-        fprintf('  layout %3d: infeasible, skipped\n', rep);
-        objAcc(rep,:) = NaN;
-        continue;
-    end
+    assert(nnz(xo) == nMatch && all(A(logical(xo))), 'Invalid cost matching');
     s1 = assignment_stats(xo, c, D, W, C, N, Q, portStation, nStations);
 
     % ---- (2)(3)(4) decentralised rules, averaged over ORDERS orders.
@@ -371,9 +333,10 @@ for rep = 1:REPS
     %      with (2) isolates the value of the criterion under decentralised
     %      behaviour; comparing it with (1) isolates the value of
     %      coordination at a fixed criterion.
-    [s2, t2, last2] = avg_greedy(@() greedy_nearest(D, A),              ORDERS, c, D, W, C, N, Q, portStation, nStations);
-    [s3, t3, last3] = avg_greedy(@() greedy_cheapest_k(D, C, A, kNear), ORDERS, c, D, W, C, N, Q, portStation, nStations);
-    [s4, t4, last4] = avg_greedy(@() greedy_cost(c, A),                 ORDERS, c, D, W, C, N, Q, portStation, nStations);
+    [~, commonOrders] = sort(rand(ORDERS,N),2);
+    [s2, t2, util2] = avg_greedy(@(o) greedy_nearest(D, A, commonOrders(o,:)),              ORDERS, c, D, W, C, N, Q, portStation, nStations);
+    [s3, t3, util3] = avg_greedy(@(o) greedy_cheapest_k(D, C, A, kNear, commonOrders(o,:)), ORDERS, c, D, W, C, N, Q, portStation, nStations);
+    [s4, t4, util4] = avg_greedy(@(o) greedy_cost(c, A, commonOrders(o,:)),                 ORDERS, c, D, W, C, N, Q, portStation, nStations);
     timeAcc(rep,2) = t2;
     timeAcc(rep,3) = t3;
     timeAcc(rep,4) = t4;
@@ -383,15 +346,10 @@ for rep = 1:REPS
     %      distance and blind to price and time. Its assignment is evaluated
     %      with the full cost c, which is what makes the comparison fair.
     Hd = D;
-    Hd(~A) = BIGM;
     t0 = tic;
     xd = full(double(solve_fun(A, Hd)));
     timeAcc(rep,5) = toc(t0);
-    if nnz(xd) < N || any(~A(logical(xd)))
-        fprintf('  layout %3d: min-distance matching infeasible, skipped\n', rep);
-        objAcc(rep,:) = NaN;
-        continue;
-    end
+    assert(nnz(xd) == nMatch && all(A(logical(xd))), 'Invalid distance matching');
     s5 = assignment_stats(xd, c, D, W, C, N, Q, portStation, nStations);
 
     S = {s1, s2, s3, s4, s5};
@@ -408,11 +366,8 @@ for rep = 1:REPS
     end
 
     % ---- per-method post-processing: how many vehicles each STATION serves
-    Xall = {xo, last2.x, last3.x, last4.x, xd};
-    for k = 1:nMethods
-        utilAcc(:,k) = utilAcc(:,k) + ...
-                       accumarray(portStation, sum(Xall{k},2), [nStations 1]);
-    end
+    utilAcc = utilAcc + [accumarray(portStation, sum(xo,2), [nStations 1]), ...
+        util2, util3, util4, accumarray(portStation, sum(xd,2), [nStations 1])];
 
     if mod(rep, 10) == 0
         fprintf('  layout %3d/%d done | optimal %.1f | nearest %.1f | cheapest-k %.1f\n', ...
@@ -469,10 +424,7 @@ for k = 1:nMethods
         labels{k}, mDist(k), sDist(k), mD90(k), sD90(k), ...
         mDmax(k), sDmax(k), mSpend(k), sSpend(k), mUnused(k), sUnused(k));
 end
-fprintf(['\n  Read the last column against the first: the min-distance ' ...
-         'matching is\n  globally optimal on the trip length and pays for ' ...
-         'it on the energy bill.\n']);
-fprintf('\n  EVs repaired per layout: mean %.1f of %d (%.2f%%)\n', ...
+fprintf('\n  Isolated EVs per layout: mean %.1f of %d (%.2f%%)\n', ...
         mean(repAcc(valid)), N, 100*mean(repAcc(valid))/N);
 
 %% ------------------------------------------------------------------
@@ -497,14 +449,12 @@ fprintf('\n  EVs repaired per layout: mean %.1f of %d (%.2f%%)\n', ...
 % that never changes. The second quantity is the one reported, because it
 % is a property of the network rather than of one snapshot, and because
 % every other column of the table is likewise aggregated over the layouts.
-% A station counts as never used when its mean utilisation stays below
-% 0.05 vehicles, that is when it is chosen in fewer than one layout in
-% twenty.
+% A station is never used if every recorded assignment sends it zero vehicles.
 neverUsed = nan(1, nMethods);
 if nValid > 0
     utilMeanTab = utilAcc / nValid;
     for k = 1:nMethods
-        neverUsed(k) = nnz(utilMeanTab(:,k) < 0.05);
+        neverUsed(k) = nnz(utilMeanTab(:,k) == 0);
     end
 end
 
@@ -619,16 +569,14 @@ axis(ax, 'equal'); set(ax, 'FontSize', 11);
 
 % ---------- FIGURES 2a-2c: one boxplot per criterion ---------------------
 % One separate figure per criterion, so that each can be sized and placed
-% independently in the paper. Together they tell a single story: on the real
-% network the coordinated assignment dominates both baselines on the
-% aggregate objective AND on each of its components taken separately.
+% independently. Read the realized total alongside the number served.
 %
 % All three share the same figure size, so that placing them side by side in
 % LaTeX with a common width yields a common height.
 
 f2a = figure('Position', [80 100 560 460]);
 boxplot_or_bar(objAcc(valid,:), shortLabels);
-ylabel('Realised global objective');
+ylabel('Generalized cost of served requests [USD]');
 title(sprintf('Objective (%d instances)', nValid));
 grid on; box on; set(gca, 'FontSize', 11);
 
@@ -701,7 +649,7 @@ cb.FontSize = 11;
 fprintf('\nStation utilisation, vehicles served by the busiest station:\n');
 for k = 1:nMethods
     fprintf('  %-26s %5.1f   (stations left unused: %d of %d)\n', ...
-            labels{k}, max(utilMean(:,k)), nnz(utilMean(:,k) < 0.05), nStations);
+            labels{k}, max(utilMean(:,k)), nnz(utilMean(:,k) == 0), nStations);
 end
 
 %% ------------------------------------------------------------------
@@ -740,7 +688,9 @@ results.costAcc    = costAcc;
 results.waitAcc    = waitAcc;
 results.servAcc    = servAcc;
 results.timeAcc    = timeAcc;
-results.repaired   = repAcc;
+results.repaired   = zeros(size(repAcc)); % preserved output field, hard eligibility
+results.isolated   = repAcc;
+results.maxMatched = maxCard;
 results.valid      = valid;
 results.meanObj    = mObj;   results.stdObj  = sObj;
 results.meanDist   = mDist;  results.stdDist = sDist;
@@ -767,14 +717,13 @@ end % ===================== end of main function =====================
 %  LOCAL FUNCTIONS
 %  ==================================================================
 
-function [W, C, P, B, A, nRepaired, Q] = draw_instance(portStation, nStations, portPow, D, ...
+function [W, C, P, B, A, nIsolated, Q] = draw_instance(portStation, nStations, portPow, D, ...
                                                     Cmin, Cmax, rhoMin, rhoMax, Qrange, Rmax_km, N)
 % DRAW_INSTANCE  Draw the port attributes and build the acceptable matrix.
 %
 % Price and waiting time are drawn once per STATION and then shared by all
 % the ports of that station: a tariff and a queue are properties of the
-% site, not of the individual socket. The power, in contrast, is a property
-% of the connector and comes from the dataset.
+% site. The power is assigned using the observed connector class.
 %
 % The acceptable matrix follows Definition 2.4, A = delta .* R, with
 %   R_ij = 1      if port i is within the driving range of vehicle j;
@@ -804,25 +753,8 @@ function [W, C, P, B, A, nRepaired, Q] = draw_instance(portStation, nStations, p
     delta = C <= ratio;                                 % M x N by expansion
     A     = double(R & delta);
 
-    % REPAIR OF STRANDED VEHICLES. A vehicle sampled at the edge of the
-    % network may find no port that is at once within range and within
-    % budget. Such a vehicle is not a modelling case of interest: the model
-    % assumes that every EV in the system needs a charge AND can obtain one.
-    % For those vehicles only, we grant reachability of their nearest
-    % affordable port, which amounts to assuming the driver stretches the
-    % trip slightly. The count is returned so the intervention stays visible.
-    stranded  = find(sum(A,1) == 0);
-    nRepaired = numel(stranded);
-    for j = stranded
-        affordable_j = find(delta(:,j));
-        if isempty(affordable_j)
-            [~, i0] = min(D(:,j));           % not even affordable: nearest
-        else
-            [~, k0] = min(D(affordable_j, j));
-            i0 = affordable_j(k0);
-        end
-        A(i0, j) = 1;
-    end
+    nIsolated = nnz(~any(A, 1));
+
 end
 
 
@@ -1009,11 +941,9 @@ function m = assignment_stats(x, c, D, W, C, N, Q, portStation, nStations)
 end
 
 
-function [m, tmean, last] = avg_greedy(runFcn, ORDERS, c, D, W, C, N, Q, portStation, nStations)
+function [m, tmean, utilization] = avg_greedy(runFcn, ORDERS, c, D, W, C, N, Q, portStation, nStations)
 % AVG_GREEDY  Average a greedy policy over ORDERS random processing orders.
-% A decentralised policy depends on who commits to a port first, so a single
-% run is not representative. The assignment of the LAST run is returned in
-% "last", to feed the station-utilisation figure.
+% Utilization averages station counts over the same orders as the metrics.
 %
 % Every field produced by assignment_stats is averaged, tail statistics
 % included. Averaging a 90th percentile across processing orders is a
@@ -1027,11 +957,11 @@ function [m, tmean, last] = avg_greedy(runFcn, ORDERS, c, D, W, C, N, Q, portSta
     fields = {'obj','dist','cost','wait','served','d90','dmax','spend','unused'};
     acc    = cell2struct(num2cell(zeros(numel(fields),1)), fields, 1);
     ttot   = 0;
-    last   = struct('x', []);
+    utilization = zeros(nStations, 1);
 
     for o = 1:ORDERS
         t0 = tic;
-        x  = runFcn();
+        x  = runFcn(o);
         ttot = ttot + toc(t0);
 
         s = assignment_stats(x, c, D, W, C, N, Q, portStation, nStations);
@@ -1039,9 +969,7 @@ function [m, tmean, last] = avg_greedy(runFcn, ORDERS, c, D, W, C, N, Q, portSta
             acc.(fields{f}) = acc.(fields{f}) + s.(fields{f});
         end
 
-        % The assignment of the last run is returned, so that the caller can
-        % compute station utilisation from it.
-        last.x = x;
+        utilization = utilization + accumarray(portStation, sum(x,2), [nStations 1]) / ORDERS;
     end
 
     for f = 1:numel(fields)
@@ -1097,8 +1025,8 @@ function util_panel(figHandle, pos, sLat, sLon, util, cmax, ttl, showLat)
                       [min(sLon)-pad, max(sLon)+pad]);
         title(gx, ttl);
         set(gx, 'FontSize', 11);
-        colormap(gx, turbo);
-        clim(gx, [0 cmax]);
+        colormap(gx, parula);
+        caxis(gx, [0 cmax]);
         if ~showLat
             % Blank the tick labels rather than hiding the ruler, so that the
             % grid lines survive and the two maps still look identical.
@@ -1119,8 +1047,8 @@ function util_panel(figHandle, pos, sLat, sLon, util, cmax, ttl, showLat)
         end
         title(ax, ttl); axis(ax, 'equal');
         set(ax, 'FontSize', 11);
-        colormap(ax, turbo);
-        clim(ax, [0 cmax]);
+        colormap(ax, parula);
+        caxis(ax, [0 cmax]);
     end
 end
 

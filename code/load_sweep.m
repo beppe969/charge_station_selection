@@ -1,4 +1,6 @@
 function results = load_sweep(csvFile, figdir, cityTag, REPS)
+% Legacy MATLAB exploration. The revised manuscript and its paired uncertainty
+% estimates are reproduced by revised_city_study.py.
 % LOAD_SWEEP  How the value of coordination changes with occupancy (Sec. 4.3).
 %
 %   results = load_sweep(csvFile, figdir, cityTag, REPS)
@@ -7,11 +9,8 @@ function results = load_sweep(csvFile, figdir, cityTag, REPS)
 % ratio is the configuration of Section 4.1 and reproduces it, which is a
 % free consistency check.
 %
-% Two things keep the comparison honest. Everything is per SERVED vehicle,
-% because the sequential rules abandon a growing share of the fleet as the
-% load rises and a sum over fewer terms would flatter them. And feasibility
-% is verified with a maximum-cardinality matching before each solve, since
-% at high occupancy a complete assignment need not exist.
+% Service is evaluated on all layouts. Per-served averages are descriptive
+% and can concern different vehicle cohorts under different policies.
 %
 % Produces load_sweep_<city>.pdf and a LaTeX table.
 
@@ -39,21 +38,16 @@ rhoMin   = 0.40;   rhoMax = 0.60;   % [$/kWh]
 kNear    = 3;
 ORDERS   = 5;                       % processing orders per greedy run
 sigmaKm  = 2.5;
-BIGM     = 1e6;
+
 
 Cmin = 0.303;  Cmax = 0.530;                      % [$/kWh]
-pow_level1 = 7;  pow_level2 = 19;  pow_dcfast = 50;  % [kW]
+pow_level1 = 1.4;  pow_level2 = 7.2;  pow_dcfast = 50;  % [kW]
 
 alpha = objective_weights();
 
 rng(11, 'twister');
 
-if exist('hungarian_assignment_sparse', 'file') == 2
-    solve_fun = @hungarian_assignment_sparse;
-else
-    warning('hungarian_assignment_sparse not found: using the dense version.');
-    solve_fun = @hungarian_assignment_binary;
-end
+solve_fun = @matchpairs_assignment;
 
 %% ==================================================================
 %  PART 0: load the network and expand the stations into ports
@@ -155,37 +149,31 @@ for a = 1:nLoad
         [W, C, P, A, Q] = draw_instance(portStation, nStations, portPow, D, ...
                               Cmin, Cmax, rhoMin, rhoMax, Qrange, Rmax_km, N);
 
-        % Feasibility first. See the header for why the solver cannot be
-        % trusted to report it on its own.
         [~, nMatch] = hopcroft_karp(A);
-        if nMatch < N
-            nInfeas(a) = nInfeas(a) + 1;
-            continue;
-        end
+        nInfeas(a) = nInfeas(a) + (nMatch < N);
 
         c = build_objective_matrix(D, W, C, P, Q, alpha);
 
         % ---- (1) the proposed model
-        H = c;  H(~A) = BIGM;
+        H = c;
         xo = full(double(solve_fun(A, H)));
-        if nnz(xo) < N || any(~A(logical(xo)))
-            nInfeas(a) = nInfeas(a) + 1;
-            continue;
-        end
+        assert(nnz(xo) == nMatch && all(A(logical(xo))), 'Invalid cost matching');
 
         % ---- (4) minimum total distance, same solver, different criterion
-        Hd = D;  Hd(~A) = BIGM;
+        Hd = D;
         xd = full(double(solve_fun(A, Hd)));
+        assert(nnz(xd) == nMatch && all(A(logical(xd))), 'Invalid distance matching');
 
         % ---- (2)(3)(4) the decentralised rules, averaged over orders.
         % The third commits ports sequentially like the others but scores
         % them with the full criterion c, so it separates the value of
         % coordinating from the value of looking at the right criterion.
-        s2 = avg_policy(@() greedy_nearest_assignment(D, A), ...
+        [~, commonOrders] = sort(rand(ORDERS,N),2);
+        s2 = avg_policy(@(o) greedy_nearest_assignment(D, A, commonOrders(o,:)), ...
                         ORDERS, c, D, C, N, Q);
-        s3 = avg_policy(@() greedy_cheapest_k_nearest(D, C, A, kNear), ...
+        s3 = avg_policy(@(o) greedy_cheapest_k_nearest(D, C, A, kNear, commonOrders(o,:)), ...
                         ORDERS, c, D, C, N, Q);
-        s4 = avg_policy(@() greedy_cost_assignment(c, A), ...
+        s4 = avg_policy(@(o) greedy_cost_assignment(c, A, commonOrders(o,:)), ...
                         ORDERS, c, D, C, N, Q);
 
         s1 = per_served(xo, c, D, C, N, Q);
@@ -204,7 +192,7 @@ for a = 1:nLoad
     good = all(isfinite(accObj), 2);
     objPS(a,:)   = mean(accObj(good,:), 1);
     objPSsd(a,:) = std( accObj(good,:), 0, 1);
-    servPct(a,:) = mean(accServ(good,:), 1);
+    servPct(a,:) = mean(accServ, 1);
     distM(a,:)   = mean(accDist(good,:), 1);
     d90M(a,:)    = mean(accD90(good,:), 1);
     spendM(a,:)  = mean(accSpd(good,:), 1);
@@ -250,7 +238,7 @@ for k = 2:nMethods
          'DisplayName', labels{k});
 end
 xlabel('Load ratio N / M');
-ylabel('Excess cost over the optimum [%]');
+ylabel('Difference in policy-specific mean cost [%]');
 title('Value of coordination against the load');
 legend('Location','northeast','Box','off');
 set(gca,'FontSize',11);
@@ -297,7 +285,7 @@ fprintf(['\\caption{Effect of the load ratio on the value of coordination, ' ...
 fprintf('\\label{tab:load_sweep_%s}\n\\small\n', lower(cityTag));
 fprintf('\\setlength{\\tabcolsep}{5pt}\n');
 fprintf('\\begin{tabular}{cccccccc}\n\\toprule\n');
-fprintf([' & & \\multicolumn{4}{c}{\\textbf{Excess cost over the optimum [\\%%]}} & ' ...
+fprintf([' & & \\multicolumn{4}{c}{\\textbf{Difference in policy-specific mean cost [\\%%]}} & ' ...
          '\\multicolumn{2}{c}{\\textbf{Fleet served [\\%%]}} \\\\\n']);
 fprintf('\\cmidrule(lr){3-6}\\cmidrule(lr){7-8}\n');
 fprintf(['$N/M$ & $N$ & Nearest & Cheapest-%d & Greedy-cost & Min-dist & ' ...
@@ -368,7 +356,7 @@ function m = avg_policy(runFcn, ORDERS, c, D, C, N, Q)
     acc    = cell2struct(num2cell(zeros(numel(fields),1)), fields, 1);
 
     for o = 1:ORDERS
-        s = per_served(runFcn(), c, D, C, N, Q);
+        s = per_served(runFcn(o), c, D, C, N, Q);
         for f = 1:numel(fields)
             acc.(fields{f}) = acc.(fields{f}) + s.(fields{f});
         end
@@ -383,7 +371,7 @@ function [W, C, P, A, Q] = draw_instance(portStation, nStations, portPow, D, ...
                               Cmin, Cmax, rhoMin, rhoMax, Qrange, Rmax_km, N)
 % DRAW_INSTANCE  Port attributes and acceptable matrix, as in Section 4.3.
 % Price and waiting time are drawn once per STATION and shared by its
-% ports; the power comes from the connector type in the dataset.
+% ports. Numerical power is an assumption for each observed connector class.
 
     statC = Cmin + (Cmax - Cmin) * rand(nStations,1);
     statW = rand(nStations,1) * 15;
@@ -399,20 +387,7 @@ function [W, C, P, A, Q] = draw_instance(portStation, nStations, portPow, D, ...
     delta = C <= ratio;
     A     = double(R & delta);
 
-    % Same repair convention as the case studies: a vehicle with no
-    % acceptable port is granted its nearest affordable one, because a
-    % stranded vehicle is a different problem from the one studied here.
-    stranded = find(sum(A,1) == 0);
-    for j = stranded
-        affordable_j = find(delta(:,j));
-        if isempty(affordable_j)
-            [~, i0] = min(D(:,j));
-        else
-            [~, k0] = min(D(affordable_j, j));
-            i0 = affordable_j(k0);
-        end
-        A(i0, j) = 1;
-    end
+
 end
 
 

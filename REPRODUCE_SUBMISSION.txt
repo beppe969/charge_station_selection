@@ -1,0 +1,195 @@
+Charging-port assignment | Replication package, version 1.0
+=========================================================
+
+This guide accompanies main_submission.tex. The station inventories and the
+Washington street file in data/ are frozen inputs. Driver origins, requests,
+prices, external waits and access scenarios are simulated. A layout is one
+complete draw of the drivers and site conditions. All policies being compared
+within that layout see the same underlying draw.
+
+Rebuild the paper and repeat the analyses
+-----------------------------------------
+
+The manuscript source is distributed separately. To typeset the paper from its
+source archive, open a terminal in the directory containing main_submission.tex
+and run the following command.
+
+    latexmk -pdf main_submission.tex
+
+The archive includes the tables, figures and three bibliography databases that
+the manuscript uses. A TeX installation with elsarticle, the packages listed
+at the top of the manuscript, latexmk and BibTeX can build the paper directly.
+
+To repeat the numerical work, use a writable clone of the repository or
+unpack the replication archive. Start in the directory containing this guide,
+data/, code/ and results/. The tested interpreter is 64-bit CPython 3.9.7.
+In a Python 3.9 environment, install the exact versions in requirements.txt
+and use the submission option to run the full Python analysis.
+
+    python -m pip install -r requirements.txt
+    python run_revised.py --workers 2 --submission
+
+The runner checks the Secure Hash Algorithm 256-bit (SHA-256) digests
+in data/inventory.sha256. It then reproduces the source-reconciled inventories,
+dispatch comparisons, Washington road distances, site-selection and held-out
+tests, and writes the manuscript numbers and tables in results/. One worker
+can be selected with --workers 1. The extended_city_analysis.py stage
+generates the city cost decomposition, the common-power comparison, the site and cost figures, and
+the planning tables in results/extended/. It checks reference costs and
+service against the primary experiments. The final stages repeat the five
+questions below. To rerun just those checks against the supplied results/
+archive, use the following two commands. Both read the local inputs.
+
+    python code/submission_sensitivities.py
+    python code/tivoli_power_study.py
+
+Five questions tested for the submission
+----------------------------------------
+
+1. Does a third reservation at Tivoli Square deliver another full charge?
+   The original two 7.2-kilowatt ports share a modeled site limit of
+   14.4 kilowatts. The alternatives have three ports and either the same
+   14.4-kilowatt limit or an upgraded limit of 21.6 kilowatts. At a given
+   time, all plugged-in vehicles share the available power equally up to
+   7.2 kilowatts per port. A session completing its request frees its share.
+   All sessions start together. We record energy delivered and completed
+   sessions by 4, 6 and 8 hours. These are separate hypothetical departure
+   windows. We also record the time to a complete charge if the driver stays.
+   The same 96 held-out Washington batches and 2 km straight-line limit apply
+   to all three configurations. Starting from the original least-cost,
+   maximum-service assignment, the test keeps both original Tivoli customers
+   and admits a third when an alternating sequence of reservations permits it.
+   The code checks that every change respects eligibility and that the increase
+   in reservations reproduces the archived expansion result.
+
+2. Does the selected site help when every driver can travel farther?
+   On the same 96 batches of 527 requests, set the one-way straight-line
+   allowance to 2.0, 2.5 or 3.0 km for all drivers. Compare the installed
+   network with a single additional Level 2 port at either Tivoli Square or
+   the comparison site. The sets of candidates and selected sites are fixed
+   before the held-out comparisons. For context, we count the increases at
+   all 245 sites with Level 2 equipment. Their largest count is a descriptive
+   maximum calculated after observing the test batches.
+
+3. What if drivers in the same batch have different travel allowances?
+   Repeat the same comparisons with each driver's allowance drawn independently
+   and with equal probability from 2.0, 2.5 and 3.0 km. The random generator
+   uses [62119, layout index]. Each driver keeps that allowance under every
+   intervention. This specifies one illustrative distribution.
+
+4. Do connector restrictions change the value of joint booking?
+   In each city, compare three vehicle fleets on the original 30 public
+   inventory layouts at one request per two installed ports. All vehicles
+   have access to every connector in the reference case. In the restricted
+   case every driver loses access to the direct-current fast ports at records
+   where every matching national record lists TESLA as its sole connector.
+   In the mixed case this restriction applies independently to each driver
+   with probability 0.5. Slower ports at those sites remain available.
+   The mixed case uses [20261122, city index, layout index], with city indices
+   0, 1 and 2 for Washington, Chicago and Manhattan. No adapter data or
+   observed fleet shares enter these scenarios. Each case preserves the
+   installed inventory, demand, site attributes and three processing orders.
+   Joint and sequential costs are compared on the drivers whom sequential
+   booking serves under that fleet's access rules.
+
+5. How much delay before confirmation would offset the saving?
+   For each city and fleet, divide the generalized cost saving per served
+   driver, in dollars, by the assumed value of confirmation time, $0.224 per
+   minute. The result is the break-even additional mean delay per served
+   driver. For an assumed extra mean wait of d minutes, subtract 0.224 times d
+   dollars from the saving per driver. The published reference-fleet
+   thresholds are 17.8 minutes in Washington, 31.2 in Chicago and 8.2 in
+   Manhattan. The calculation assumes that a minute awaiting confirmation
+   has the same value as a minute at the station. Benefits to extra drivers
+   and the actual time required to accumulate requests are outside it.
+
+How to read the outputs
+-----------------------
+
+Files with the .csv extension contain comma-separated values. Under
+results/submission/, power_sessions.csv records each assigned driver's
+requested energy, delivery and time to finish. power_layouts.csv gives site
+totals per configuration, layout and window. The three windows share the
+same bookings. power_summary.csv compares each configuration with the
+installed two-port site on the same 96 layouts. Changes in energy are in
+kilowatt-hours, and changes in completion counts are per layout. The paired
+95% intervals use 5,000 resamples of whole layouts with seed 34019.
+power_rows.tex supplies the manuscript table.
+
+sensitivity_radius_layouts.csv gives service for each travel scenario and
+batch. sensitivity_radius_candidates.csv records the count of improving
+batches for each site. Site indices are zero-based and ordered by increasing
+latitude, then longitude. sensitivity_radius_summary.csv and its companion
+sensitivity_radius_rows.tex report full baseline batches, target and
+comparison improvements, and the descriptive maximum. Each pointwise target
+interval uses the exact two-sided binomial limits for 96 independent batches.
+
+sensitivity_city_orders.csv records costs, savings and the number of served
+and connector-restricted drivers by city, layout, order and fleet. The gain
+column is dollars saved per sequentially served driver. The saving_pct column
+is the percentage of that order's sequential cost saved by reassigning those
+same drivers. sensitivity_city_summary.csv averages the three orders within
+each layout and weights the 30 layouts equally. It includes percentage-point
+differences from the reference fleet and delay thresholds in minutes. Its
+95% percentile intervals use 2,000 paired resamples of whole layouts with
+seed 4577. sensitivity_city_rows.tex supplies the manuscript table. These
+intervals reflect the simulated draws conditional on the study assumptions.
+
+The city generators use seed 103721 and the Washington planning study uses
+seed 34019, with independent splits for the sweep, site selection and the
+held-out evaluation. The sensitivity code checks each reference city cost
+against results/extended/city_cost_by_order.csv and the 2 km service counts
+against results/planning/intervention_layouts.csv. The two selected sites are
+also tested by explicitly solving each expanded assignment.
+
+To check the frozen inputs separately, run the following in data/.
+
+    shasum -a 256 -c inventory.sha256
+
+On systems with GNU coreutils the equivalent command is sha256sum -c
+inventory.sha256. From the replication package root, the three summary files
+can be checked with the following command and reference SHA-256 digests.
+
+    shasum -a 256 results/submission/*summary.csv
+7cf3f784da947238f132c89426fc10f6825ac49608edfe32d47913168b312fa4  results/submission/power_summary.csv
+2810f1bc77458ae3329cd42d9633365274aad57d04ef75b84f9c5c6a4aa12f24  results/submission/sensitivity_city_summary.csv
+d7047394056e5060ba3e5f3fd1f74114861311b2dab1f2ddd9c3641da8c4e8f7  results/submission/sensitivity_radius_summary.csv
+
+The digests identify the exact bytes of the archived numerical summaries.
+When checking results on other software versions, allow for floating-point
+precision, solver choices among tied assignments and file-format differences.
+
+Reproduce calibration, synthetic comparisons and solver checks
+--------------------------------------------------------------
+
+The published synthetic experiments used MATLAB R2020a, Optimization Toolbox
+and Statistics and Machine Learning Toolbox. The solver benchmark used
+Optimization Toolbox 8.5. From the replication package root in MATLAB, run
+
+    addpath(fullfile(pwd,'code'))
+    scratch = tempname;
+    mkdir(scratch)
+    cd(scratch)
+    set(0,'DefaultFigureVisible','off')
+    C = calibration_pareto('');
+    R = structural_analysis('');
+    write_extended_synthetic(C,R)
+    verify_assignment(fullfile(scratch,'solver'))
+    toy_equivalence('')
+
+Calibration writes calibrated_alpha.mat to the scratch directory. The
+synthetic comparisons use the selected weights, and the writer saves the
+calibration grid, the 100-network policy comparison, the network-size series
+and their manuscript table rows under results/extended/. The city experiments
+retain their independently specified monetary valuations.
+
+verify_assignment tests the optimization formulations and compares four
+solver implementations on identical inputs. The command above writes the
+local benchmark trials, summaries and environment to scratch/solver.
+results/solver/ preserves the trials, summaries and hardware description
+behind the published benchmark. Wall-clock times depend on the processor,
+solver version, thread count and system load. The archived timings let a
+reader reconstruct the published table while comparing objectives, service
+and feasibility with those from a new run. README.pdf and README.tex provide
+the source inventory audit, road-network conventions and baseline experiment
+details.

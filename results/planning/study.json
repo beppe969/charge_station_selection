@@ -1,0 +1,37 @@
+{
+  "seed": 34019,
+  "sweep_layouts": 64,
+  "discovery_layouts": 32,
+  "test_layouts": 96,
+  "ports": 1053,
+  "vehicles": 527,
+  "sites": 251,
+  "target": 234,
+  "control": 19,
+  "target_latlon": [
+    38.930935,
+    -77.031061
+  ],
+  "control_latlon": [
+    38.878192,
+    -77.00306
+  ],
+  "target_ports": [
+    0,
+    2,
+    0
+  ],
+  "control_ports": [
+    0,
+    2,
+    0
+  ],
+  "target_minus_control_additional_mean": 0.7604166666666666,
+  "target_minus_control_paired_bootstrap95": [
+    0.6666666666666666,
+    0.84375
+  ],
+  "bootstrap_resamples": 5000,
+  "infrastructure_assumption": "7.2 kW incremental headroom at each candidate",
+  "site_id": "zero-based index in increasing latitude then longitude"
+}

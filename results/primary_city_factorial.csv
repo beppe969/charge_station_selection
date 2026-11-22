@@ -1,0 +1,28 @@
+city,case,fallback_usd,contrast,usd_per_request,lo,hi
+Washington,base,50,batching given full cost,3.963744637,3.888007354,4.03442958
+Washington,base,50,batching given distance,0.5145392405,0.3355309516,0.706195563
+Washington,base,50,difference of batching effects,3.449205397,3.241054142,3.649690134
+Washington,base,100,batching given full cost,3.992207635,3.917104356,4.063609019
+Washington,base,100,batching given distance,0.518755981,0.3410156508,0.7100406909
+Washington,base,100,difference of batching effects,3.473451654,3.262749013,3.673285339
+Washington,base,200,batching given full cost,4.049133632,3.968917567,4.12156703
+Washington,base,200,batching given distance,0.5271894619,0.3509316958,0.7187700692
+Washington,base,200,difference of batching effects,3.52194417,3.305072972,3.729188369
+Chicago,base,50,batching given full cost,6.70560743,6.53528122,6.88191326
+Chicago,base,50,batching given distance,1.182211404,0.9707905414,1.408589316
+Chicago,base,50,difference of batching effects,5.523396026,5.313260404,5.739514806
+Chicago,base,100,batching given full cost,6.936005052,6.77875535,7.098091383
+Chicago,base,100,batching given distance,1.594697469,1.415128225,1.79231353
+Chicago,base,100,difference of batching effects,5.341307583,5.138226958,5.551673643
+Chicago,base,200,batching given full cost,7.396800295,7.217761719,7.567356541
+Chicago,base,200,batching given distance,2.419669598,2.222638342,2.61905907
+Chicago,base,200,difference of batching effects,4.977130697,4.72933156,5.231850408
+Manhattan,base,50,batching given full cost,1.826556286,1.784377693,1.872332146
+Manhattan,base,50,batching given distance,0.03086387676,-0.04747369395,0.1110552641
+Manhattan,base,50,difference of batching effects,1.795692409,1.699015901,1.894593652
+Manhattan,base,100,batching given full cost,1.826556286,1.784377693,1.872332146
+Manhattan,base,100,batching given distance,0.03086387676,-0.04747369395,0.1110552641
+Manhattan,base,100,difference of batching effects,1.795692409,1.699015901,1.894593652
+Manhattan,base,200,batching given full cost,1.826556286,1.784377693,1.872332146
+Manhattan,base,200,batching given distance,0.03086387676,-0.04747369395,0.1110552641
+Manhattan,base,200,difference of batching effects,1.795692409,1.699015901,1.894593652

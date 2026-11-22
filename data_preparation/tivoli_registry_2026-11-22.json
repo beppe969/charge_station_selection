@@ -1,0 +1,88 @@
+{
+  "checked_on": "2026-11-22",
+  "archive_coordinates": {
+    "latitude": 38.930935,
+    "longitude": -77.031061
+  },
+  "provider": "National Laboratory of the Rockies, Alternative Fuel Stations application programming interface",
+  "last_update": {
+    "url": "https://developer.nlr.gov/api/alt-fuel-stations/v1/last-updated.json?api_key=DEMO_KEY",
+    "response": {
+      "last_updated": "2026-11-22T06:24:31Z"
+    }
+  },
+  "historical_id_query": {
+    "url": "https://developer.nlr.gov/api/alt-fuel-stations/v1/167946.json?api_key=DEMO_KEY",
+    "http_status": 404,
+    "response": {
+      "errors": [
+        "Couldn't find alternative fuel station with ID of 167946"
+      ],
+      "error_details": [
+        {
+          "code": "INVALID_PARAM",
+          "status": "422",
+          "detail": "Couldn't find alternative fuel station with ID of 167946"
+        }
+      ]
+    }
+  },
+  "nearest_site_query": {
+    "url": "https://developer.nlr.gov/api/alt-fuel-stations/v1/nearest.json?api_key=DEMO_KEY&latitude=38.930935&longitude=-77.031061&fuel_type=ELEC&radius=0.1&limit=5&status=all&access=all",
+    "response": {
+      "station_locator_url": "https://afdc.energy.gov/stations/",
+      "total_results": 0,
+      "station_counts": {
+        "total": 0,
+        "fuels": {
+          "BD": {
+            "total": 0
+          },
+          "E85": {
+            "total": 0
+          },
+          "ELEC": {
+            "total": 0
+          },
+          "HY": {
+            "total": 0
+          },
+          "LNG": {
+            "total": 0
+          },
+          "CNG": {
+            "total": 0
+          },
+          "LPG": {
+            "total": 0
+          },
+          "RD": {
+            "total": 0
+          }
+        }
+      },
+      "latitude": 38.930935,
+      "longitude": -77.031061,
+      "location_country": null,
+      "precision": null,
+      "offset": 0,
+      "fuel_stations": []
+    }
+  },
+  "wider_radius_check": {
+    "url": "https://developer.nlr.gov/api/alt-fuel-stations/v1/nearest.json?api_key=DEMO_KEY&latitude=38.930935&longitude=-77.031061&fuel_type=ELEC&radius=1&limit=1&status=all&access=all",
+    "returned_fields": {
+      "total_results": 6,
+      "fuel_stations": [
+        {
+          "id": 452320,
+          "station_name": "itselectric",
+          "street_address": "1640 Columbia Rd NW",
+          "distance": 0.54584,
+          "distance_km": 0.87844,
+          "status_code": "E"
+        }
+      ]
+    }
+  }
+}

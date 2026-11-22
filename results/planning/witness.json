@@ -1,0 +1,82 @@
+{
+  "discovery_layout": 15,
+  "root_vehicle": 83,
+  "range_km": 2.0,
+  "budget_center": 0.5,
+  "full_network_deficit": 8,
+  "witness_ev_count": 3,
+  "witness_port_count": 2,
+  "witness_requested_kwh": 126.97542131994447,
+  "witness_min_unserved_kwh": 32.593013312687305,
+  "any_isolated": false,
+  "vehicles": [
+    {
+      "id": 4,
+      "east_km": -1.3032712307713779,
+      "north_km": 3.964121027485098,
+      "kwh": 32.593013312687305,
+      "budget_per_kwh": 0.4460323329642902
+    },
+    {
+      "id": 66,
+      "east_km": -0.2232994605428975,
+      "north_km": 4.592646207969487,
+      "kwh": 34.94976807246992,
+      "budget_per_kwh": 0.4331690346239697
+    },
+    {
+      "id": 83,
+      "east_km": -1.230837683963606,
+      "north_km": 3.9954509451307265,
+      "kwh": 59.43263993478724,
+      "budget_per_kwh": 0.428019726934593
+    }
+  ],
+  "neighbor_sites": [
+    {
+      "id": 234,
+      "latitude": 38.930935,
+      "longitude": -77.031061,
+      "ports": 2,
+      "tariff": 0.3462379805173928
+    }
+  ],
+  "target_site": 234,
+  "control_site": 19,
+  "discovery_target_hits": 30,
+  "discovery_control_hits": 0,
+  "intervention_results": [
+    {
+      "policy": "baseline",
+      "served": 519,
+      "deficit": 8,
+      "additional": 0,
+      "common_cohort_cost": 43532.27292425985,
+      "cohort_saving_usd_per_ev": 0.0
+    },
+    {
+      "policy": "target_socket",
+      "served": 520,
+      "deficit": 7,
+      "additional": 1,
+      "common_cohort_cost": 43518.21707882214,
+      "cohort_saving_usd_per_ev": 0.02708255382988372
+    },
+    {
+      "policy": "control_socket",
+      "served": 519,
+      "deficit": 8,
+      "additional": 0,
+      "common_cohort_cost": 43532.27292425985,
+      "cohort_saving_usd_per_ev": 0.0
+    },
+    {
+      "policy": "target_discount",
+      "served": 519,
+      "deficit": 8,
+      "additional": 0,
+      "common_cohort_cost": 43529.71007049804,
+      "cohort_saving_usd_per_ev": 0.00493806119809326
+    }
+  ]
+}

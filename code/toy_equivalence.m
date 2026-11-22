@@ -5,21 +5,15 @@ function results = toy_equivalence(figdir)
 % side by side, then repeats over a batch of random instances and checks
 % that the optimal costs agree to solver tolerance.
 %
-% The assignments agree too, not just the costs, which is more than total
-% unimodularity guarantees: the cost coefficients are continuous, so two
-% matchings tie with probability zero and the optimum is almost surely
-% unique. With quantised data (a tariff menu, rounded distances) the two
-% methods could legitimately return different, equally optimal assignments.
+% Tied optima may give different assignments. Objective agreement verifies
+% equivalence, and the code reports assignment identity separately.
 %
 % Produces toy_assignment_20x20.pdf and toy_assignment_50x30.pdf.
 
 
-cvx_solver mosek % Set mosek solver which is faster than default
-cvx_solver_settings('MSK_IPAR_OPTIMIZER', 'MSK_OPTIMIZER_FREE_SIMPLEX')
+mip = optimoptions('intlinprog','Display','off','RelativeGapTolerance',0);
 
 rng(1); % set seed
-
-BIGM = 1e6;   % penalty used to forbid the non-acceptable pairs
 
 if nargin < 1;  figdir = 'Figures';  end
 if ~isempty(figdir) && ~isfolder(figdir)
@@ -66,32 +60,13 @@ c = build_objective_matrix(D, W, C, P, Qdemand, alpha);
 
 % ---- MILP
 tic
-cvx_begin quiet
-    % Using Mosek solver, we are able to solve MILP problems
-    variable x(M,N) binary
-
-    % Objective function
-    minimize( sum(sum( x .* c )) )
-
-    subject to
-        % Each EV is assigned to exactly one port
-        sum(x,1)' == 1;
-        % Each port serves at most one EV
-        sum(x,2) <= 1;
-        % Acceptable matrix constraint
-        x <= A;
-cvx_end
+[x,~,~,~,cost_milp] = filtered_assignment_program(A,c,true,[],mip);
 time_milp = toc;
+x = round(x);
 
-% CVX returns x as a SPARSE matrix: densify it before using or comparing it
-x = full(round(x));
-cost_milp = cvx_optval;   % cvx_optval is already a plain double
-
-% ---- Hungarian: non-acceptable pairs are forbidden with a large penalty
-H = c;
-H(~A) = BIGM;
+% ---- Hungarian on eligible pairs
 tic
-[assignments, ~, ~, ~] = hungarian_assignment_binary(A, H);
+[assignments, ~, ~, ~] = hungarian_assignment_binary(A, c);
 time_hung = toc;
 
 % munkres may return a sparse or logical matrix: densify it as well
@@ -100,6 +75,17 @@ cost_hung   = sum(sum(c .* assignments));
 
 sameCost   = abs(cost_milp - cost_hung) < TOL;
 sameAssign = isequal(x, assignments);
+
+results.toy.A          = A;
+results.toy.c          = c;
+results.toy.x_milp     = x;
+results.toy.x_hung     = assignments;
+results.toy.cost_milp  = cost_milp;
+results.toy.cost_hung  = cost_hung;
+results.toy.time_milp  = time_milp;
+results.toy.time_hung  = time_hung;
+results.toy.sameCost   = sameCost;
+results.toy.sameAssign = sameAssign;
 
 % ---- display the instance
 disp('Acceptable matrix A =');   disp(A);
@@ -151,19 +137,9 @@ for v = 1:size(visSizes,1)
 
     cv = build_objective_matrix(Dv, Wv, Cv, Pv, Qv, alpha);
 
-    cvx_begin quiet
-        variable xv(Mv,Nv) binary
-        minimize( sum(sum( xv .* cv )) )
-        subject to
-            sum(xv,1)' == 1;
-            sum(xv,2)  <= 1;
-            xv <= Av;
-    cvx_end
-    xv = full(round(xv));
-    costM = cvx_optval;
-
-    Hv = cv;  Hv(~Av) = BIGM;
-    xh = full(double(hungarian_assignment_binary(Av, Hv)));
+    [xv,~,~,~,costM] = filtered_assignment_program(Av,cv,true,[],mip);
+    xv = round(xv);
+    xh = full(double(hungarian_assignment_binary(Av, cv)));
     costH = sum(sum(cv .* xh));
 
     agreeCost = abs(costM - costH) < TOL;
@@ -249,21 +225,11 @@ for s = 1:nSizes
         c = build_objective_matrix(D, W, C, P, Qdemand, alpha);
 
         % ---- MILP
-        cvx_begin quiet
-            variable x(Ms,Ns) binary
-            minimize( sum(sum( x .* c )) )
-            subject to
-                sum(x,1)' == 1;
-                sum(x,2) <= 1;
-                x <= A;
-        cvx_end
-        x  = full(round(x));
-        c1 = cvx_optval;
+        [x,~,~,~,c1] = filtered_assignment_program(A,c,true,[],mip);
+        x = round(x);
 
-        % ---- Hungarian (console output suppressed with evalc)
-        H = c;
-        H(~A) = BIGM;
-        evalc('assignments = hungarian_assignment_binary(A, H);');
+        % ---- Hungarian on the same eligible pairs
+        assignments = hungarian_assignment_binary(A, c);
         assignments = full(double(assignments));
         c2 = sum(sum(c .* assignments));
 
@@ -294,9 +260,8 @@ fprintf('\n\n=========== COPY THE BLOCKS BELOW INTO THE PAPER ===========\n\n');
 fprintf('%s\n', '% ---------- Table: toy instance ----------');
 fprintf('%s\n', '\begin{table}[t]');
 fprintf('%s\n', '\centering');
-fprintf('%s\n', sprintf(['\\caption{Toy instance ($M=%d$, $N=%d$). The MILP (CVX/Mosek) and the ' ...
-                         'Hungarian algorithm return the same optimal cost and, since the cost ' ...
-                         'coefficients are continuous, the same assignment. Produced by ' ...
+fprintf('%s\n', sprintf(['\\caption{Toy instance ($M=%d$, $N=%d$). The MILP (intlinprog) and the ' ...
+                         'Hungarian algorithm are compared by objective value and assignment identity. Produced by ' ...
                          '\\texttt{toy\\_equivalence.m}.}'], M, N));
 fprintf('%s\n', '\label{tab:toy}');
 fprintf('%s\n', '\begin{tabular}{lcc}');
@@ -337,17 +302,6 @@ fprintf('\n============================================================\n\n');
 %  Collect the results
 %  ------------------------------------------------------------------
 
-results.toy.A          = A;
-results.toy.c          = c;
-results.toy.x_milp     = x;
-results.toy.x_hung     = assignments;
-results.toy.cost_milp  = cost_milp;
-results.toy.cost_hung  = cost_hung;
-results.toy.time_milp  = time_milp;
-results.toy.time_hung  = time_hung;
-results.toy.sameCost   = sameCost;
-results.toy.sameAssign = sameAssign;
-
 results.sizes     = sizes;
 results.nTested   = nTested;
 results.fracCost  = fracCost;
@@ -366,7 +320,7 @@ function plot_assignment(x, ttl)
     [M, N] = size(x);
     imagesc(x);
     colormap(gca, [1.00 0.99 0.88; 0.91 0.29 0.21]);   % empty, assigned
-    clim([0 1]);
+    caxis([0 1]);
 
     % A SQUARE BOX, not square cells. "axis image" would keep each cell
     % square and let the panel inherit the aspect ratio of the matrix, which

@@ -46,8 +46,6 @@ ORDERS = 5;     % random processing orders per greedy run
 kNear = 3;      % neighbourhood size of the k-nearest policy
 p_acc = 0.6;    % acceptance probability of the acceptable matrix A
 
-BIGM = 1e6;     % penalty used to forbid the non-acceptable pairs
-
 % Objective coefficients. Every term of the objective is expressed in
 % dollars, so these are conversion factors with a physical meaning
 % ($/km and $/min): the model has two of them, since the energy term is
@@ -70,12 +68,12 @@ Qmin = 20;   Qmax = 60;    % [kWh]
 Cmin = 0.303;  % [$/kWh]
 Cmax = 0.530;  % [$/kWh]
 
-% The sparse Hungarian is the solver of choice; fall back to the dense one
-if exist('hungarian_assignment_sparse', 'file') == 2
-    solver_name = 'sparse Hungarian';
-    solve_fun   = @hungarian_assignment_sparse;
+% Compare the dense-input MATLAB matchpairs result against sequential policies.
+if exist('matchpairs', 'file') == 2
+    solver_name = 'MATLAB matchpairs (dense input)';
+    solve_fun   = @matchpairs_assignment;
 else
-    warning('hungarian_assignment_sparse not found: using the dense version.');
+    warning('MATLAB matchpairs unavailable: using Munkres.');
     solver_name = 'dense Hungarian';
     solve_fun   = @hungarian_assignment_binary;
 end
@@ -89,7 +87,7 @@ end
 % discriminates where the cost matrix is correlated, which is the case on
 % the real networks, where the ports of one station share its tariff and
 % its queue. See greedy_cost_assignment.m.
-labels      = {'Optimal (Hungarian)', 'Greedy nearest', sprintf('Cheapest of %d-nearest', kNear)};
+labels      = {'Batch optimum', 'Greedy nearest', sprintf('Cheapest of %d-nearest', kNear)};
 shortLabels = {'Optimal', 'Nearest', sprintf('Cheapest-%d', kNear)};
 nMethods    = 3;
 
@@ -129,10 +127,8 @@ for rep = 1:REPS
     c = build_objective_matrix(D, W, C, P, Q, alpha);
 
     % ---- (1) optimal
-    H = c;
-    H(~A) = BIGM;   % set a very big number for unadmissible selections
     t0 = tic;
-    xo = solve_fun(A, H);
+    xo = solve_fun(A, c);
     timeAcc(rep,1) = toc(t0);
     xo = full(double(xo));          % the solver may return a sparse matrix
     s1 = assignment_stats(xo, c, D, W, C, N);

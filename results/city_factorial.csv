@@ -1,0 +1,109 @@
+city,case,fallback_usd,contrast,usd_per_request,lo,hi
+Washington,base,50,batching given full cost,3.963744637,3.888007354,4.03442958
+Washington,base,50,batching given distance,0.5145392405,0.3355309516,0.706195563
+Washington,base,50,difference of batching effects,3.449205397,3.241054142,3.649690134
+Washington,base,100,batching given full cost,3.992207635,3.917104356,4.063609019
+Washington,base,100,batching given distance,0.518755981,0.3410156508,0.7100406909
+Washington,base,100,difference of batching effects,3.473451654,3.262749013,3.673285339
+Washington,base,200,batching given full cost,4.049133632,3.968917567,4.12156703
+Washington,base,200,batching given distance,0.5271894619,0.3509316958,0.7187700692
+Washington,base,200,difference of batching effects,3.52194417,3.305072972,3.729188369
+Washington,low load,50,batching given full cost,5.9404639,5.808352723,6.06610505
+Washington,low load,50,batching given distance,0.2586384363,0.1412278231,0.3665095037
+Washington,low load,50,difference of batching effects,5.681825464,5.519119584,5.842106933
+Washington,low load,100,batching given full cost,5.9404639,5.808352723,6.06610505
+Washington,low load,100,batching given distance,0.2586384363,0.1412278231,0.3665095037
+Washington,low load,100,difference of batching effects,5.681825464,5.519119584,5.842106933
+Washington,low load,200,batching given full cost,5.9404639,5.808352723,6.06610505
+Washington,low load,200,batching given distance,0.2586384363,0.1412278231,0.3665095037
+Washington,low load,200,difference of batching effects,5.681825464,5.519119584,5.842106933
+Washington,medium-high load,50,batching given full cost,3.152192915,2.9773148,3.323395156
+Washington,medium-high load,50,batching given distance,0.5147046755,0.3774215103,0.6328711434
+Washington,medium-high load,50,difference of batching effects,2.63748824,2.474370838,2.808045826
+Washington,medium-high load,100,batching given full cost,3.682432015,3.557052227,3.807776593
+Washington,medium-high load,100,batching given distance,0.6412869539,0.5048458556,0.7566943531
+Washington,medium-high load,100,difference of batching effects,3.041145061,2.883499953,3.200221676
+Washington,medium-high load,200,batching given full cost,4.742910215,4.468709825,5.035744657
+Washington,medium-high load,200,batching given distance,0.8944515109,0.7394227069,1.027804693
+Washington,medium-high load,200,difference of batching effects,3.848458704,3.547174958,4.187713056
+Washington,high load,50,batching given full cost,0.2859705214,-0.002268170929,0.5469384978
+Washington,high load,50,batching given distance,0.1624008293,0.07148541442,0.2499663893
+Washington,high load,50,difference of batching effects,0.1235696921,-0.14524903,0.3687984188
+Washington,high load,100,batching given full cost,3.367637188,3.272727591,3.451973507
+Washington,high load,100,batching given distance,0.7568452737,0.7024351905,0.8109942694
+Washington,high load,100,difference of batching effects,2.610791914,2.501792208,2.711918248
+Washington,high load,200,batching given full cost,9.530970521,9.074549618,10.02709087
+Washington,high load,200,batching given distance,1.945734163,1.785208425,2.109053307
+Washington,high load,200,difference of batching effects,7.585236359,7.182190406,8.000000059
+Washington,circuity,50,batching given full cost,3.815979745,3.694322799,3.930756982
+Washington,circuity,50,batching given distance,0.4914323492,0.2989373213,0.6962941146
+Washington,circuity,50,difference of batching effects,3.324547396,3.133368344,3.522430557
+Washington,circuity,100,batching given full cost,3.937211034,3.826630953,4.053143622
+Washington,circuity,100,batching given distance,0.5873631946,0.4026028696,0.7873527361
+Washington,circuity,100,difference of batching effects,3.349847839,3.164378488,3.542085532
+Washington,circuity,200,batching given full cost,4.17967361,4.059499865,4.313018514
+Washington,circuity,200,batching given distance,0.7792248856,0.5896277011,0.9891891678
+Washington,circuity,200,difference of batching effects,3.400448724,3.206921794,3.590775175
+Washington,two centres,50,batching given full cost,3.263177834,3.197168943,3.330085773
+Washington,two centres,50,batching given distance,0.1913944924,0.1307303058,0.2547728011
+Washington,two centres,50,difference of batching effects,3.071783342,2.984010634,3.153025212
+Washington,two centres,100,batching given full cost,3.26423202,3.198085485,3.331137452
+Washington,two centres,100,batching given distance,0.1913944924,0.1307303058,0.2547728011
+Washington,two centres,100,difference of batching effects,3.072837527,2.985485189,3.154231217
+Washington,two centres,200,batching given full cost,3.26634039,3.200219663,3.333541063
+Washington,two centres,200,batching given distance,0.1913944924,0.1307303058,0.2547728011
+Washington,two centres,200,difference of batching effects,3.074945897,2.986073752,3.156539966
+Washington,variable power,50,batching given full cost,5.169873681,5.082298006,5.245679539
+Washington,variable power,50,batching given distance,1.230361885,1.034392798,1.439867935
+Washington,variable power,50,difference of batching effects,3.939511795,3.717251375,4.152778072
+Washington,variable power,100,batching given full cost,5.190957383,5.100456281,5.27206921
+Washington,variable power,100,batching given distance,1.234578626,1.039775083,1.444328968
+Washington,variable power,100,difference of batching effects,3.956378757,3.728497667,4.178536901
+Washington,variable power,200,batching given full cost,5.233124787,5.133810241,5.329021696
+Washington,variable power,200,batching given distance,1.243012107,1.04721905,1.450624878
+Washington,variable power,200,difference of batching effects,3.990112681,3.754003599,4.214870097
+Washington,linked tariffs and waits,50,batching given full cost,3.641171831,3.580612357,3.697926677
+Washington,linked tariffs and waits,50,batching given distance,0.686543245,0.5717729095,0.8196726567
+Washington,linked tariffs and waits,50,difference of batching effects,2.954628586,2.795873009,3.100222159
+Washington,linked tariffs and waits,100,batching given full cost,3.643280201,3.582571883,3.699262347
+Washington,linked tariffs and waits,100,batching given distance,0.6875974301,0.5732013201,0.8204292171
+Washington,linked tariffs and waits,100,difference of batching effects,2.955682771,2.795951127,3.100404318
+Washington,linked tariffs and waits,200,batching given full cost,3.647496941,3.585368152,3.703429617
+Washington,linked tariffs and waits,200,batching given distance,0.6897058003,0.5755852571,0.8228486618
+Washington,linked tariffs and waits,200,difference of batching effects,2.957791141,2.797494379,3.103820896
+Washington,lower time value,50,batching given full cost,2.203858643,2.15643124,2.24922963
+Washington,lower time value,50,batching given distance,0.3169570688,0.2335725066,0.4072975113
+Washington,lower time value,50,difference of batching effects,1.886901574,1.792648058,1.979187414
+Washington,lower time value,100,batching given full cost,2.233375826,2.184934925,2.280643197
+Washington,lower time value,100,batching given distance,0.3211738093,0.2389767615,0.4109178669
+Washington,lower time value,100,difference of batching effects,1.912202017,1.816762294,2.004502993
+Washington,lower time value,200,batching given full cost,2.292410193,2.230902127,2.355283585
+Washington,lower time value,200,batching given distance,0.3296072902,0.2462002506,0.4187549343
+Washington,lower time value,200,difference of batching effects,1.962802902,1.858158647,2.064820637
+Washington,higher distance value,50,batching given full cost,4.452583952,4.372908823,4.528433026
+Washington,higher distance value,50,batching given distance,0.7632857121,0.5818034015,0.9543571693
+Washington,higher distance value,50,difference of batching effects,3.68929824,3.491657361,3.878118841
+Washington,higher distance value,100,batching given full cost,4.474721839,4.396161361,4.554202231
+Washington,higher distance value,100,batching given distance,0.7675024526,0.5878322132,0.9592393341
+Washington,higher distance value,100,difference of batching effects,3.707219387,3.508932582,3.898398892
+Washington,higher distance value,200,batching given full cost,4.518997614,4.429739689,4.607272066
+Washington,higher distance value,200,batching given distance,0.7759359335,0.5975946402,0.9699452819
+Washington,higher distance value,200,difference of batching effects,3.743061681,3.53439055,3.939580121
+Chicago,base,50,batching given full cost,6.56062132,6.396460105,6.754180674
+Chicago,base,50,batching given distance,0.8738455495,0.6241953927,1.116293235
+Chicago,base,50,difference of batching effects,5.686775771,5.377491523,6.013390953
+Chicago,base,100,batching given full cost,6.891199832,6.746856194,7.06671215
+Chicago,base,100,batching given distance,1.360530582,1.101577864,1.603857949
+Chicago,base,100,difference of batching effects,5.530669251,5.235843669,5.854185927
+Chicago,base,200,batching given full cost,7.552356857,7.330867619,7.789379743
+Chicago,base,200,batching given distance,2.333900646,2.002992959,2.668200518
+Chicago,base,200,difference of batching effects,5.218456211,4.897318438,5.542846535
+Manhattan,base,50,batching given full cost,2.645921947,2.598691607,2.6951296
+Manhattan,base,50,batching given distance,0.07627446458,-0.00356816459,0.1601953525
+Manhattan,base,50,difference of batching effects,2.569647482,2.480933708,2.659990377
+Manhattan,base,100,batching given full cost,2.645921947,2.598691607,2.6951296
+Manhattan,base,100,batching given distance,0.07627446458,-0.00356816459,0.1601953525
+Manhattan,base,100,difference of batching effects,2.569647482,2.480933708,2.659990377
+Manhattan,base,200,batching given full cost,2.645921947,2.598691607,2.6951296
+Manhattan,base,200,batching given distance,0.07627446458,-0.00356816459,0.1601953525
+Manhattan,base,200,difference of batching effects,2.569647482,2.480933708,2.659990377
