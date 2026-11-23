@@ -2,6 +2,8 @@
 
 This repository reproduces the analyses in *Cost and service trade-offs in budget-constrained electric vehicle charging-port assignment* by Luca Ambrosino, Hong T. M. Chu, Laurent El Ghaoui and Giuseppe C. Calafiore. The study compares sequential and joint booking in Washington, Chicago and Manhattan, then tests what a third charging port at Washington’s historical Tivoli Square site could deliver before drivers leave.
 
+The analyses now support two manuscripts: *Joint Reservation of Electric Vehicle Charging Ports: Who Gains and When to Batch* (IEEE T-ITS) and *Where would one more charging socket help? A matching-based case study* (Sustainable Energy, Grids and Networks). [PAPERS.md](PAPERS.md) maps every table and figure of each paper to its script and output. `python run_tits.py --workers 2` and `python run_casestudy.py --workers 2` regenerate the results of one paper each.
+
 The station inventories and Washington street network are archived inputs. Driver requests, tariffs, waiting times, connector access and site power are modeled. All inputs needed to reproduce the results are included in this checkout.
 
 ## Run the submission analysis
